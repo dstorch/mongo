@@ -25,15 +25,63 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
+#include <boost/algorithm/string.hpp>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "mongo/base/initializer.h"
+#include "mongo/db/query/shapeanalyzer/shapeanalyzer.h"
 #include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/log.h"
+
+namespace mongo {
+
+    static void analyzeOneShape(ShapeAnalyzer* analyzer, const std::string& shape) {
+        std::vector<std::string> shapePieces;
+        boost::split(shapePieces, shape, boost::is_any_of("\t"));
+
+        // Empty fields get converted into the empty obj, except for the namespace.
+        for (size_t i = 1; i < shapePieces.size(); i++) {
+            if (shapePieces[i].empty()) {
+                shapePieces[i] = ShapeAnalyzer::empty;
+            }
+        }
+
+        if (shapePieces.size() == 4U) {
+            StatusWith<ShapeAnalysisResult> status = analyzer->analyze(shapePieces[0],
+                                                                       shapePieces[1],
+                                                                       shapePieces[2],
+                                                                       shapePieces[3]);
+            if (!status.isOK()) {
+                log() << "Failed to analyze shape " << shape << " due to: " << status.getStatus();
+            }
+            else {
+                status.getValue().log(std::cout);
+            }
+        }
+        else {
+            log() << "Did not find 4 tab-separated fields in: " << shape;
+        }
+    }
+
+    static void analyzeAllShapes() {
+        std::unique_ptr<ShapeAnalyzer> analyzer(new ShapeAnalyzer());
+
+        // Read from stdin until eof.
+        for (std::string line; std::getline(std::cin, line); ) {
+            analyzeOneShape(analyzer.get(), line);
+        }
+    }
+
+} // namespace mongo
 
 int main( int argc, char **argv, char **envp ) {
     ::mongo::setupSynchronousSignalHandlers();
     ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
-    std::cout << "Hello, world!" << std::endl;
+    ::mongo::analyzeAllShapes();
+    return 0;
 }

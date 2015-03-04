@@ -1,0 +1,22 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Program(
+    "shapeanalyzer",
+    ["shapeanalyzer_main.cpp"],
+    LIBDEPS=[
+        "libshapeanalyzer",
+    ],
+)
+
+env.Library(
+    target="libshapeanalyzer",
+    source="shapeanalyzer.cpp",
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_planner",
+        "$BUILD_DIR/mongo/base/base",
+        "$BUILD_DIR/mongo/signal_handlers_synchronous",
+        "$BUILD_DIR/mongo/unittest/unittest_crutch",
+    ],
+)

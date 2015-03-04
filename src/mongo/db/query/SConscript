@@ -31,6 +31,17 @@ env.Library(
     ],
 )
 
+env.Program(
+    "shapeanalyzer",
+    ["shapeanalyzer_main.cpp"],
+    LIBDEPS=[
+        "query_planner",
+        "$BUILD_DIR/mongo/base/base",
+        "$BUILD_DIR/mongo/signal_handlers_synchronous",
+        "$BUILD_DIR/mongo/unittest/unittest_crutch",
+    ],
+)
+
 env.Library(
     target='query',
     source=[

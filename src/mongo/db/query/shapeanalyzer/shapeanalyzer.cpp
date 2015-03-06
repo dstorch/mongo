@@ -27,90 +27,88 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
+#include <algorithm>
+#include <iostream>
+#include <iomanip>
 
-#include "mongo/db/json.h"
 #include "mongo/db/query/shapeanalyzer/shapeanalyzer.h"
 
 namespace mongo {
 
-namespace {
-
-    Status fromjsonSafe(const std::string& json, BSONObj* out) {
-        *out = fromjson(json);
-        return Status::OK();
+    ShapeAnalysisResult::ShapeAnalysisResult()
+        : timesSeen(0) {
     }
 
-} // namespace
+    void ShapeAnalysisResult::computeStats() {
+        std::sort(millis.begin(), millis.end(), std::greater<int>());
+        this->minMillis = millis.front();
+        this->maxMillis = millis.back();
 
-    void ShapeAnalysisResult::log(std::ostream& out) const {
-        out << ns << "\t"
-            << rawPredicate << "\t"
-            << rawProjection << "\t"
-            << rawSort << "\t"
-            << cacheKey << "\t"
-            << std::endl;
+        size_t sum = 0;
+        for (size_t n : millis) {
+            sum += n;
+        }
+        this->meanMillis = (static_cast<double>(sum) / static_cast<double>(millis.size()));
     }
 
-    std::string ShapeAnalyzer::empty = "{}";
-
-    StatusWith<ShapeAnalysisResult> ShapeAnalyzer::analyze(const std::string& ns,
-                                                           const std::string& predicate) {
-        return analyze(ns, predicate, ShapeAnalyzer::empty, ShapeAnalyzer::empty);
+    void ShapeAnalysisResult::report() const {
+        // TODO
+        /*
+        std::cout << std::left << std::setfill(" ")
+                  << std::setw(15) << this->ns << "\t"
+                  << std::setw(15) << this->predicate << "\t"
+                  << std::setw(15) << this->projection << "\t"
+                  << std::setw(15) << this->sort << "\t"
+                  << std::setw(6)  << this->timesSeen << std::end;
+        */
     }
 
-    StatusWith<ShapeAnalysisResult> ShapeAnalyzer::analyze(const std::string& ns,
-                                                           const std::string& predicate,
-                                                           const std::string& projection,
-                                                           const std::string& sort) {
-        BSONObj predicateObj, projectionObj, sortObj;
+    void ShapeAnalyzer::add(const QueryLogParser& logParser) {
+        ShapeAnalysisKey analysisKey;
+        const CanonicalQuery& query = logParser.getCanonicalQuery();
+        analysisKey.cacheKey = query.getPlanCacheKey();
+        analysisKey.ns = logParser.getNS();
 
-        Status predicateStatus = fromjsonSafe(predicate, &predicateObj);
-        if (!predicateStatus.isOK()) {
-            return StatusWith<ShapeAnalysisResult>(predicateStatus);
+        ShapeAnalysisResult& result = _shapes[analysisKey];
+
+        if (result.timesSeen == 0U) {
+            result.ns = analysisKey.ns;
+            result.predicate = logParser.getPredicate();
+            result.projection = logParser.getProjection();
+            result.sort = logParser.getSort();
         }
 
-        Status projectionStatus = fromjsonSafe(projection, &projectionObj);
-        if (!projectionStatus.isOK()) {
-            return StatusWith<ShapeAnalysisResult>(projectionStatus);
-        }
-
-        Status sortStatus = fromjsonSafe(sort, &sortObj);
-        if (!sortStatus.isOK()) {
-            return StatusWith<ShapeAnalysisResult>(sortStatus);
-        }
-
-        std::unique_ptr<CanonicalQuery> cq;
-        {
-            CanonicalQuery* cqRaw;
-            Status status = CanonicalQuery::canonicalize(ns,
-                                                         predicateObj,
-                                                         sortObj,
-                                                         projectionObj,
-                                                         &cqRaw);
-            if (!status.isOK()) {
-                return StatusWith<ShapeAnalysisResult>(status);
-            }
-
-            cq.reset(cqRaw);
-        }
-
-        return analyze(std::move(cq));
+        result.timesSeen++;
+        result.millis.push_back(logParser.getMillis());
     }
 
-    StatusWith<ShapeAnalysisResult> ShapeAnalyzer::analyze(std::unique_ptr<CanonicalQuery> cq) {
-        ShapeAnalysisResult result;
+    struct ShapeAnalysisResultComparator {
+        bool operator()(const ShapeAnalysisResult& left, const ShapeAnalysisResult& right) const {
+            return left.meanMillis < right.meanMillis;
+        }
+    };
 
-        result.ns = cq->ns();
+    void ShapeAnalyzer::computeStats() {
+        for (auto i = _shapes.begin(); i != _shapes.end(); ++i) {
+            ShapeAnalysisResult& shapeResult = i->second;
+            shapeResult.computeStats();
+            _sortedShapes.push_back(shapeResult);
+        }
 
-        result.rawPredicate = cq->getParsed().getFilter();
-        result.rawProjection = cq->getParsed().getProj();
-        result.rawSort = cq->getParsed().getSort();
+        std::sort(_sortedShapes.begin(), _sortedShapes.end(), ShapeAnalysisResultComparator());
+    }
 
-        const PlanCacheKey& key = cq->getPlanCacheKey();
-        result.cacheKey = key;
+    void ShapeAnalyzer::report() const {
+        std::cout << std::left << std::setfill(" ")
+                  << std::setw(15) << "namespace" << "\t"
+                  << std::setw(15) << "predicate_shape" << "\t"
+                  << std::setw(15) << "projection_shape" << "\t"
+                  << std::setw(15) << "sort_shape" << "\t"
+                  << std::setw(6)  << "count" << std::endl;
 
-        return StatusWith<ShapeAnalysisResult>(result);
+        for (ShapeAnalysisResult shape : _sortedShapes) {
+            shape.report();
+        }
     }
 
 } // namespace mongo

@@ -151,7 +151,12 @@ namespace mongo {
         ThreadSafeString ns;
         BSONObj query;
         BSONObj updateobj;
-        
+
+        // Experimental: for better log analysis.
+        BSONObj predicate;
+        BSONObj projection;
+        BSONObj sort;
+
         // detailed options
         long long cursorid;
         int ntoreturn;

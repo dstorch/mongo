@@ -847,6 +847,10 @@ namespace mongo {
         curop.debug().nscannedObjects = summaryStats.totalDocsExamined;
         curop.debug().idhack = summaryStats.isIdhack;
 
+        curop.debug().predicate = pq.getFilter();
+        curop.debug().projection = pq.getProj();
+        curop.debug().sort = pq.getSort();
+
         // Set debug information for consumption by the profiler.
         if (dbProfilingLevel > 0 ||
             curop.elapsedMillis() > serverGlobalParams.slowMS ||

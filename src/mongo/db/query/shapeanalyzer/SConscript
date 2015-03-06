@@ -12,11 +12,15 @@ env.Program(
 
 env.Library(
     target="libshapeanalyzer",
-    source="shapeanalyzer.cpp",
+    source=[
+        "query_log_parser.cpp",
+        "shapeanalyzer.cpp",
+    ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/query_planner",
         "$BUILD_DIR/mongo/base/base",
+        "$BUILD_DIR/mongo/db/query/query_planner",
         "$BUILD_DIR/mongo/signal_handlers_synchronous",
         "$BUILD_DIR/mongo/unittest/unittest_crutch",
+        "$BUILD_DIR/third_party/shim_boost",
     ],
 )

@@ -449,6 +449,17 @@ namespace {
             }
         }
 
+        // For experimental log parsing.
+        if (!predicate.isEmpty()) {
+            s << " predicate: " << predicate.toString();
+        }
+        if (!projection.isEmpty()) {
+            s << " projection: " << projection.toString();
+        }
+        if (!sort.isEmpty()) {
+            s << " sort: " << sort.toString();
+        }
+
         if (!planSummary.empty()) {
             s << " planSummary: " << planSummary.toString();
         }

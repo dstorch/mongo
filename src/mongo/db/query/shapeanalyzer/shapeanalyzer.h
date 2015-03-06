@@ -27,43 +27,73 @@
 
 #pragma once
 
-#include <iostream>
-#include <unordered_map>
+#include <memory>
 
-#include "mongo/base/status_with.h"
+#include "mongo/base/owned_pointer_map.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/shapeanalyzer/query_log_parser.h"
 
 namespace mongo {
 
+    struct ShapeAnalysisKey {
+        PlanCacheKey cacheKey;
+        std::string ns;
+    };
+
+    struct ShapeAnalysisKeyHasher {
+        size_t operator()(const ShapeAnalysisKey& key) const {
+            return ((std::hash<std::string>()(key.cacheKey) ^
+                    (std::hash<std::string>()(key.ns) << 1)) >> 1);
+        }
+    };
+
+    struct ShapeAnalysisKeyComparator {
+        bool operator()(const ShapeAnalysisKey& left, const ShapeAnalysisKey& right) const {
+            return (left.cacheKey == right.cacheKey) && (left.ns == right.ns);
+        }
+    };
+
     struct ShapeAnalysisResult {
 
-        void log(std::ostream& out) const;
+        ShapeAnalysisResult();
+
+        void computeStats();
+
+        void report() const;
+
+        size_t timesSeen;
 
         std::string ns;
 
-        // Raw input, parsed to BSON.
-        BSONObj rawPredicate;
-        BSONObj rawProjection;
-        BSONObj rawSort;
+        // We just store these for the first instance of the shape.
+        BSONObj predicate;
+        BSONObj projection;
+        BSONObj sort;
 
-        // The internal key used to represent this query shape.
-        std::string cacheKey;
+        // We store these each time we see the shape.
+        std::vector<size_t> millis;
+
+        // These get filled out during the stats computation phase.
+        double meanMillis;
+        size_t minMillis;
+        size_t maxMillis;
     };
 
     class ShapeAnalyzer {
     public:
-        static std::string empty;
+        void add(const QueryLogParser& logParser);
 
-        StatusWith<ShapeAnalysisResult> analyze(const std::string& ns,
-                                                const std::string& predicate);
+        void computeStats();
 
-        StatusWith<ShapeAnalysisResult> analyze(const std::string& ns,
-                                                const std::string& predicate,
-                                                const std::string& projection,
-                                                const std::string& sort);
+        void report() const;
 
-        StatusWith<ShapeAnalysisResult> analyze(std::unique_ptr<CanonicalQuery> cq);
+    private:
+        std::unordered_map<ShapeAnalysisKey,
+                           ShapeAnalysisResult,
+                           ShapeAnalysisKeyHasher,
+                           ShapeAnalysisKeyComparator> _shapes;
 
+        std::vector<ShapeAnalysisResult> _sortedShapes;
     };
 
 } // namespace mongo

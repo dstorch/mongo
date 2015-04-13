@@ -87,7 +87,7 @@ namespace {
                                               false, // explain
                                               &lpq);
         ASSERT_OK(result);
-        ASSERT_EQUALS(6, lpq->getNumToReturn());
+        ASSERT_EQUALS(6, *lpq->getBatchSize());
         ASSERT(lpq->wantMore());
         delete lpq;
 
@@ -99,7 +99,7 @@ namespace {
                                        false, // explain
                                        &lpq);
         ASSERT_OK(result);
-        ASSERT_EQUALS(6, lpq->getNumToReturn());
+        ASSERT_EQUALS(6, *lpq->getBatchSize());
         ASSERT(!lpq->wantMore());
         delete lpq;
     }
@@ -404,9 +404,9 @@ namespace {
         ASSERT_EQUALS(0, expectedProj.woCompare(lpq->getProj()));
         BSONObj expectedHint = BSON("d" << 1);
         ASSERT_EQUALS(0, expectedHint.woCompare(lpq->getHint()));
-        ASSERT_EQUALS(3, lpq->getLimit());
+        ASSERT_EQUALS(3, *lpq->getLimit());
         ASSERT_EQUALS(5, lpq->getSkip());
-        ASSERT_EQUALS(90, lpq->getBatchSize());
+        ASSERT_EQUALS(90, *lpq->getBatchSize());
         ASSERT(lpq->wantMore());
     }
 
@@ -769,6 +769,18 @@ namespace {
         const bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseCommandIsFromFindCommand) {
+        BSONObj cmdObj = fromjson("{find: 'testns'}");
+
+        LiteParsedQuery* rawLpq;
+        const bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
+        ASSERT_OK(status);
+
+        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        ASSERT(lpq->fromFindCommand());
     }
 
     //

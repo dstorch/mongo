@@ -94,11 +94,11 @@ namespace {
         if (!lpq->getMax().isEmpty()) { query.minKey(lpq->getMax()); }
         if (lpq->isExplain()) { query.explain(); }
         if (lpq->isSnapshot()) { query.snapshot(); }
-        int nToReturn = lpq->wantMore() ? lpq->getLimit() : -lpq->getLimit();
+        int nToReturn = lpq->getLimit() ? (*lpq->getLimit() * -1) : 0;
         int nToSkip = lpq->getSkip();
         const BSONObj* fieldsToReturn = &lpq->getProj();
         int queryOptions = lpq->getOptions();
-        int batchSize = lpq->getBatchSize();
+        int batchSize = lpq->getBatchSize() ? *lpq->getBatchSize() : 0;
 
         std::unique_ptr<DBClientCursor> cursor =
             conn->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);

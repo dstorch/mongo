@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    const int GetMoreRequest::kDefaultBatchSize = 101;
+    const int GetMoreRequest::kDefaultGetMoreBatchSize = 101;
 
     GetMoreRequest::GetMoreRequest()
         : cursorid(0),
@@ -95,7 +95,7 @@ namespace mongo {
         }
         const std::string fullns = parseNs(dbname, cmdObj);
 
-        int batchSize = kDefaultBatchSize;
+        int batchSize = kDefaultGetMoreBatchSize;
         BSONElement batchSizeElt = cmdObj["batchSize"];
         if (batchSizeElt.type() != BSONType::NumberInt && !batchSizeElt.eoo()) {
             return StatusWith<GetMoreRequest>(ErrorCodes::TypeMismatch, str::stream()

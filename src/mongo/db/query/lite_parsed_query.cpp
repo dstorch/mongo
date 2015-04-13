@@ -48,6 +48,8 @@ namespace mongo {
     const string LiteParsedQuery::metaRecordId("recordId");
     const string LiteParsedQuery::metaIndexKey("indexKey");
 
+    const int LiteParsedQuery::kDefaultBatchSize = 101;
+
     namespace {
 
         Status checkFieldType(const BSONElement& el, BSONType type) {
@@ -71,6 +73,7 @@ namespace mongo {
                                  LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
         pq->_ns = fullns;
+        pq->_fromCommand = true;
         pq->_explain = isExplain;
 
         // Parse the command BSON by looping through one element at a time.
@@ -152,11 +155,11 @@ namespace mongo {
                 }
 
                 int limit = el.numberInt();
-                if (limit < 0) {
-                    return Status(ErrorCodes::BadValue, "limit value must be non-negative");
+                if (limit <= 0) {
+                    return Status(ErrorCodes::BadValue, "limit value must be positive");
                 }
 
-                pq->_limit = limit;
+                pq->_limit.reset(limit);
             }
             else if (mongoutils::str::equals(fieldName, "batchSize")) {
                 if (!el.isNumber()) {
@@ -171,7 +174,7 @@ namespace mongo {
                     return Status(ErrorCodes::BadValue, "batchSize value must be positive");
                 }
 
-                pq->_batchSize = batchSize;
+                pq->_batchSize.reset(batchSize);
             }
             else if (mongoutils::str::equals(fieldName, "singleBatch")) {
                 Status status = checkFieldType(el, Bool);
@@ -549,9 +552,8 @@ namespace mongo {
 
     LiteParsedQuery::LiteParsedQuery() :
         _skip(0),
-        _limit(0),
-        _batchSize(101),
         _wantMore(true),
+        _fromCommand(false),
         _explain(false),
         _maxScan(0),
         _maxTimeMS(0),
@@ -607,8 +609,11 @@ namespace mongo {
                                  bool fromQueryMessage) {
         _ns = ns;
         _skip = ntoskip;
-        _limit = ntoreturn;
         _proj = proj.getOwned();
+
+        if (ntoreturn) {
+            _batchSize.reset(ntoreturn);
+        }
 
         // Initialize flags passed as 'queryOptions' bit vector.
         initFromInt(queryOptions);
@@ -617,22 +622,16 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "bad skip value in query");
         }
 
-        if (_limit == std::numeric_limits<int>::min()) {
-            // _limit is negative but can't be negated.
+        if (_batchSize && *_batchSize == std::numeric_limits<int>::min()) {
+            // _batchSize is negative but can't be negated.
             return Status(ErrorCodes::BadValue, "bad limit value in query");
         }
 
-        if (_limit < 0) {
-            // _limit greater than zero is simply a hint on how many objects to send back per
-            // "cursor batch".  A negative number indicates a hard limit.
+        if (_batchSize && *_batchSize < 0) {
+            // A negative number indicates that the cursor should be closed after the first batch.
             _wantMore = false;
-            _limit = -_limit;
+            _batchSize.reset(*_batchSize * -1);
         }
-
-        // We are constructing this LiteParsedQuery from a legacy OP_QUERY message, and therefore
-        // cannot distinguish batchSize and limit. (They are a single field in OP_QUERY, but are
-        // passed separately for the find command.) Just set both values to be the same.
-        _batchSize = _limit;
 
         if (fromQueryMessage) {
             BSONElement queryField = queryObj["query"];

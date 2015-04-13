@@ -201,7 +201,8 @@ namespace mongo {
             }
 
             // Fill out curop information.
-            beginQueryOp(nss, cmdObj, lpq->getNumToReturn(), lpq->getSkip(), txn->getCurOp());
+            int ntoreturn = lpq->getBatchSize() ? *lpq->getBatchSize() : 0;
+            beginQueryOp(nss, cmdObj, ntoreturn, lpq->getSkip(), txn->getCurOp());
 
             // 1b) Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
             std::unique_ptr<CanonicalQuery> cq;

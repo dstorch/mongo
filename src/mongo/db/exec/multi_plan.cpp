@@ -200,17 +200,16 @@ namespace mongo {
                                 size_t(fraction * _collection->numRecords(_txn)));
         }
 
-        // We treat ntoreturn as though it is a limit during plan ranking.
-        // This means that ranking might not be great for sort + batchSize.
-        // But it also means that we don't buffer too much data for sort + limit.
-        // See SERVER-14174 for details.
-        size_t numToReturn = _query->getParsed().getNumToReturn();
-
         // Determine the number of results which we will produce during the plan
         // ranking phase before stopping.
-        size_t numResults = (size_t)internalQueryPlanEvaluationMaxResults;
-        if (numToReturn > 0) {
-            numResults = std::min(numToReturn, numResults);
+        size_t numResults = static_cast<size_t>(internalQueryPlanEvaluationMaxResults);
+        if (_query->getParsed().getLimit()) {
+            numResults = std::min(static_cast<size_t>(*_query->getParsed().getLimit()),
+                                  numResults);
+        }
+        else if (!_query->getParsed().fromFindCommand() && _query->getParsed().getBatchSize()) {
+            numResults = std::min(static_cast<size_t>(*_query->getParsed().getBatchSize()),
+                                  numResults);
         }
 
         // Work the plans, stopping when a plan hits EOF or returns some

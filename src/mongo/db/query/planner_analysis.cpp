@@ -470,12 +470,20 @@ namespace mongo {
         // When setting the limit on the sort, we need to consider both
         // the limit N and skip count M. The sort should return an ordered list
         // N + M items so that the skip stage can discard the first M results.
-        if (0 != query.getParsed().getNumToReturn()) {
+        if (query.getParsed().getLimit()) {
+            // We have a true limit. The limit can be combined with the SORT stage.
+            sort->limit = static_cast<size_t>(*query.getParsed().getLimit()) +
+                          static_cast<size_t>(query.getParsed().getSkip());
+        }
+        else if (!query.getParsed().fromFindCommand() && query.getParsed().getBatchSize()) {
+            // We have an ntoreturn specified by an OP_QUERY style find. This is used
+            // by clients to mean both batchSize and limit.
+            //
             // Overflow here would be bad and could cause a nonsense limit. Cast
             // skip and limit values to unsigned ints to make sure that the
             // sum is never stored as signed. (See SERVER-13537).
-            sort->limit = size_t(query.getParsed().getNumToReturn()) +
-                          size_t(query.getParsed().getSkip());
+            sort->limit = static_cast<size_t>(*query.getParsed().getBatchSize()) +
+                          static_cast<size_t>(query.getParsed().getSkip());
 
             // This is a SORT with a limit. The wire protocol has a single quantity
             // called "numToReturn" which could mean either limit or batchSize.
@@ -735,14 +743,25 @@ namespace mongo {
         // be enforced by the blocking sort.
         // Otherwise, we need to limit the results in the case of a hard limit
         // (ie. limit in raw query is negative)
-        if (0 != query.getParsed().getNumToReturn() &&
-            !hasSortStage &&
-            !query.getParsed().wantMore()) {
-
-            LimitNode* limit = new LimitNode();
-            limit->limit = query.getParsed().getNumToReturn();
-            limit->children.push_back(solnRoot);
-            solnRoot = limit;
+        if (!hasSortStage) {
+            // We don't have a sort stage. This means that, if there is a limit, we will have
+            // to enforce it ourselves since it's not handled inside SORT.
+            if (query.getParsed().getLimit()) {
+                LimitNode* limit = new LimitNode();
+                limit->limit = *query.getParsed().getLimit();
+                limit->children.push_back(solnRoot);
+                solnRoot = limit;
+            }
+            else if (!query.getParsed().fromFindCommand()
+                     && query.getParsed().getBatchSize()
+                     && !query.getParsed().wantMore()) {
+                // We have a "legacy limit", i.e. a negative ntoreturn value from an OP_QUERY style
+                // find.
+                LimitNode* limit = new LimitNode();
+                limit->limit = *query.getParsed().getBatchSize();
+                limit->children.push_back(solnRoot);
+                solnRoot = limit;
+            }
         }
 
         soln->root.reset(solnRoot);

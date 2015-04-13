@@ -55,7 +55,7 @@ namespace mongo {
         const CursorId cursorid;
         const int batchSize;
 
-        static const int kDefaultBatchSize;
+        static const int kDefaultGetMoreBatchSize;
 
     private:
         /**

@@ -646,11 +646,9 @@ namespace {
             PlanCacheEntry entry(solutions, createDecision(1U));
             CachedSolution cachedSoln(ck, entry);
 
-            QuerySolution *out, *backupOut;
-            s = QueryPlanner::planFromCache(*scopedCq.get(), params, cachedSoln,
-                                            &out, &backupOut);
+            QuerySolution *out;
+            s = QueryPlanner::planFromCache(*scopedCq.get(), params, cachedSoln, &out);
             ASSERT_OK(s);
-            std::auto_ptr<QuerySolution> cleanBackup(backupOut);
 
             return out;
         }

@@ -317,6 +317,7 @@ namespace mongo {
                                                    plannerParams,
                                                    cs->decisionWorks,
                                                    *rootOut);
+                    *querySolutionOut = qs;
                     return Status::OK();
                 }
             }

@@ -114,7 +114,8 @@ namespace mongo {
           key(key),
           query(entry.query.getOwned()),
           sort(entry.sort.getOwned()),
-          projection(entry.projection.getOwned()) {
+          projection(entry.projection.getOwned()),
+          decisionWorks(entry.decision->stats[0]->common.works) {
         // CachedSolution should not having any references into
         // cache entry. All relevant data should be cloned/copied.
         for (size_t i = 0; i < entry.plannerData.size(); ++i) {

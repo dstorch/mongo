@@ -196,6 +196,10 @@ namespace mongo {
         BSONObj query;
         BSONObj sort;
         BSONObj projection;
+
+        // The number of work cycles taken to decide on a winning plan when the plan was first
+        // cached.
+        size_t decisionWorks;
     };
 
     /**

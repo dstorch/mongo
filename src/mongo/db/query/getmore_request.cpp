@@ -38,6 +38,15 @@
 
 namespace mongo {
 
+namespace {
+
+    const char kCmdName[] = "getMore";
+    const char kCollectionField[] = "collection";
+    const char kBatchSizeField[] = "batchSize";
+    const char kMaxTimeMSField[] = "maxTimeMS";
+
+} // namespace
+
     GetMoreRequest::GetMoreRequest()
         : cursorid(0),
           batchSize(0) { }
@@ -89,7 +98,7 @@ namespace mongo {
 
         for (BSONElement el : cmdObj) {
             const char* fieldName = el.fieldName();
-            if (str::equals(fieldName, "getMore")) {
+            if (str::equals(fieldName, kCmdName)) {
                 if (el.type() != BSONType::NumberLong) {
                     return {ErrorCodes::TypeMismatch,
                             str::stream() << "Field 'getMore' must be of type long in: " << cmdObj};
@@ -97,7 +106,7 @@ namespace mongo {
 
                 cursorid = el.Long();
             }
-            else if (str::equals(fieldName, "collection")) {
+            else if (str::equals(fieldName, kCollectionField)) {
                 if (el.type() != BSONType::String) {
                     return {ErrorCodes::TypeMismatch,
                             str::stream() << "Field 'collection' must be of type string in: "
@@ -106,7 +115,7 @@ namespace mongo {
 
                 fullns = parseNs(dbname, cmdObj);
             }
-            else if (str::equals(fieldName, "batchSize")) {
+            else if (str::equals(fieldName, kBatchSizeField)) {
                 if (!el.isNumber()) {
                     return {ErrorCodes::TypeMismatch,
                             str::stream() << "Field 'batchSize' must be a number in: " << cmdObj};
@@ -114,7 +123,7 @@ namespace mongo {
 
                 batchSize = el.numberInt();
             }
-            else if (str::equals(fieldName, "maxTimeMS")) {
+            else if (str::equals(fieldName, kMaxTimeMSField)) {
                 // maxTimeMS is parsed by the command handling code, so we don't repeat the parsing
                 // here.
                 continue;
@@ -143,6 +152,19 @@ namespace mongo {
         }
 
         return request;
+    }
+
+    BSONObj GetMoreRequest::toBSON() const {
+        BSONObjBuilder builder;
+
+        builder.append(kCmdName, cursorid);
+        builder.append(kCollectionField, nss.coll());
+
+        if (batchSize) {
+            builder.append(kBatchSizeField, *batchSize);
+        }
+
+        return builder.obj();
     }
 
 } // namespace mongo

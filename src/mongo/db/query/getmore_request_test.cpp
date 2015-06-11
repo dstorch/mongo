@@ -179,4 +179,19 @@ namespace {
         ASSERT_EQUALS(CursorId(123), result.getValue().cursorid);
     }
 
+    TEST(GetMoreRequestTest, toBSONHasBatchSize) {
+        GetMoreRequest request("testdb.testcoll", 123, 99);
+        BSONObj requestObj = request.toBSON();
+        BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection" << "testcoll"
+                                                 << "batchSize" << 99);
+        ASSERT_EQ(requestObj, expectedRequest);
+    }
+
+    TEST(GetMoreRequestTest, toBSONMissingMatchSize) {
+        GetMoreRequest request("testdb.testcoll", 123, boost::none);
+        BSONObj requestObj = request.toBSON();
+        BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection" << "testcoll");
+        ASSERT_EQ(requestObj, expectedRequest);
+    }
+
 } // namespace

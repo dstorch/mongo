@@ -453,12 +453,14 @@ ChunkPtr ChunkManager::findIntersectingChunk(const BSONObj& shardKey) const {
 
 void ChunkManager::getShardIdsForQuery(set<ShardId>& shardIds, const BSONObj& query) const {
     auto statusWithCQ = CanonicalQuery::canonicalize(_ns, query, WhereCallbackNoop());
-
     uassertStatusOK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    getShardIdsForQuery(shardIds, *cq);
+}
 
+void ChunkManager::getShardIdsForQuery(set<ShardId>& shardIds, const CanonicalQuery& cq) const {
     // Query validation
-    if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR)) {
+    if (QueryPlannerCommon::hasNode(cq.root(), MatchExpression::GEO_NEAR)) {
         uassert(13501, "use geoNear command rather than $near query", false);
     }
 
@@ -468,7 +470,7 @@ void ChunkManager::getShardIdsForQuery(set<ShardId>& shardIds, const BSONObj& qu
     //   Query { a : { $gte : 1, $lt : 2 },
     //            b : { $gte : 3, $lt : 4 } }
     //   => Bounds { a : [1, 2), b : [3, 4) }
-    IndexBounds bounds = getIndexBoundsForQuery(_keyPattern.toBSON(), *cq);
+    IndexBounds bounds = getIndexBoundsForQuery(_keyPattern.toBSON(), cq);
 
     // Transforms bounds for each shard key field into full shard key ranges
     // for example :

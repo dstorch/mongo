@@ -28,9 +28,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
+
+#include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/query/cursor_responses.h"
 #include "mongo/s/cluster_explain.h"
+#include "mongo/s/query/cluster_find.h"
 #include "mongo/s/strategy.h"
 #include "mongo/util/timer.h"
 
@@ -43,8 +48,6 @@ using std::vector;
 
 /**
  * Implements the find command on mongos.
- *
- * TODO: this is just a placeholder. It needs to be implemented for real under SERVER-15176.
  */
 class ClusterFindCmd : public Command {
     MONGO_DISALLOW_COPYING(ClusterFindCmd);
@@ -136,16 +139,67 @@ public:
             shardResults, mongosStageName, millisElapsed, out);
     }
 
+    /**
+     * TODO:
+     *  --fix op counters
+     *  --what to do with curop?
+     */
     virtual bool run(OperationContext* txn,
                      const std::string& dbname,
                      BSONObj& cmdObj,
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        // Currently only explains of finds run through the find command. Queries that are not
-        // explained use the legacy OP_QUERY path.
-        errmsg = "find command not yet implemented";
-        return false;
+        const std::string fullns = parseNs(dbname, cmdObj);
+        const NamespaceString nss(fullns);
+        if (!nss.isValid()) {
+            return appendCommandStatus(result,
+                                       {ErrorCodes::InvalidNamespace,
+                                        str::stream() << "Invalid collection name: " << nss.ns()});
+        }
+
+        const bool isExplain = false;
+        auto statusWithLpq = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
+        if (!statusWithLpq.isOK()) {
+            return appendCommandStatus(result, statusWithLpq.getStatus());
+        }
+
+        auto statusWithCQ = CanonicalQuery::canonicalize(statusWithLpq.getValue().release());
+        if (!statusWithCQ.isOK()) {
+            return appendCommandStatus(result, statusWithCQ.getStatus());
+        }
+        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+        // TODO: have to settle on how to pass read pref.
+        ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
+        BSONElement readPrefElt = cmdObj["$readPreference"];
+        if (!readPrefElt.eoo()) {
+            if (readPrefElt.type() != BSONType::Object) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::TypeMismatch,
+                     str::stream() << "read preference must be a nested object in : " << cmdObj});
+            }
+
+            auto statusWithReadPref = ReadPreferenceSetting::fromBSON(readPrefElt.Obj());
+            if (!statusWithReadPref.isOK()) {
+                return appendCommandStatus(result, statusWithReadPref.getStatus());
+            }
+            readPref = statusWithReadPref.getValue();
+        }
+
+        std::vector<BSONObj> batch;
+        auto statusWithCursorId = ClusterFind::runQuery(txn, *cq, readPref, &batch);
+        if (!statusWithCursorId.isOK()) {
+            return appendCommandStatus(result, statusWithCursorId.getStatus());
+        }
+
+        BSONArrayBuilder arr;
+        for (const auto& obj : batch) {
+            arr.append(obj);
+        }
+        appendCursorResponseObject(statusWithCursorId.getValue(), nss.ns(), arr.arr(), &result);
+        return true;
     }
 
 } cmdFindCluster;

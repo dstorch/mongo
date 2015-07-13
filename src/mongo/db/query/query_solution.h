@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/scoped_ptr.hpp>
+#include <memory>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -150,7 +151,7 @@ struct QuerySolutionNode {
 
     // If a stage has a non-NULL filter all values outputted from that stage must pass that
     // filter.
-    boost::scoped_ptr<MatchExpression> filter;
+    std::unique_ptr<MatchExpression> filter;
 
 protected:
     /**
@@ -457,6 +458,8 @@ struct IndexScanNode : public QuerySolutionNode {
     }
 
     QuerySolutionNode* clone() const;
+
+    bool operator==(const IndexScanNode& other) const;
 
     BSONObjSet _sorts;
 

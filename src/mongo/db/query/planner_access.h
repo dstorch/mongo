@@ -219,7 +219,8 @@ public:
     // 2. No fetches performed.  There will be a final fetch by the caller of buildIndexedDataAccess
     //    who set the value of inArrayOperator to true.
     // 3. No compound indices are used and no bounds are combined.  These are incorrect in the
-    //    context of these operators.
+    // context
+    //    of these operators.
     //
 
     /**
@@ -263,6 +264,28 @@ public:
     static void findElemMatchChildren(const MatchExpression* node,
                                       std::vector<MatchExpression*>* out,
                                       std::vector<MatchExpression*>* subnodesOut);
+
+    /**
+     * Given a list of OR-related subtrees returned by processIndexScans(), looks for logically
+     * equivalent IndexScanNodes and combines them. This is an optimization to avoid creating
+     * plans that repeat index access work.
+     *
+     * Example:
+     *  Suppose processIndexScans() returns a list of the following three query solutions:
+     *    1) IXSCAN (bounds: {b: [[2,2]]})
+     *    2) FETCH (filter: {d:1}) -> IXSCAN (bounds: {c: [[3,3]]})
+     *    3) FETCH (filter: {e:1}) -> IXSCAN (bounds: {c: [[3,3]]})
+     *  This method would collapse scans #2 and #3, resulting in the following output:
+     *    1) IXSCAN (bounds: {b: [[2,2]]})
+     *    2) FETCH (filter: {$or:[{d:1}, {e:1}]}) -> IXSCAN (bounds: {c: [[3,3]]})
+     *
+     * Used as a helper for buildIndexedOr().
+     *
+     * Takes ownership of 'scans'. The caller assumes ownership of the pointers in the returned
+     * list of QuerySolutionNode*.
+     */
+    static std::vector<QuerySolutionNode*> collapseEquivalentScans(
+        const std::vector<QuerySolutionNode*> scans);
 
     /**
      * Helper used by buildIndexedAnd and buildIndexedOr.

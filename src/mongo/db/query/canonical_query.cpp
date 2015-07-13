@@ -521,32 +521,30 @@ Status CanonicalQuery::canonicalize(const CanonicalQuery& baseQuery,
                                     MatchExpression* root,
                                     CanonicalQuery** out,
                                     const MatchExpressionParser::WhereCallback& whereCallback) {
-    LiteParsedQuery* lpq;
-
-    // Pass empty sort and projection.
-    BSONObj emptyObj;
-    // 0, 0, 0 is 'ntoskip', 'ntoreturn', and 'queryoptions'
-    // false, false is 'snapshot' and 'explain'
+    // TODO: we should be passing the filter corresponding to 'root' to the LPQ rather than the
+    // base query's filter, baseQuery.getParsed().getFilter().
+    LiteParsedQuery* rawLpq;
     Status parseStatus = LiteParsedQuery::make(baseQuery.ns(),
-                                               0,
-                                               0,
-                                               0,
+                                               0,  // notoskip
+                                               0,  // ntoreturn
+                                               0,  // queryOptions
                                                baseQuery.getParsed().getFilter(),
                                                baseQuery.getParsed().getProj(),
                                                baseQuery.getParsed().getSort(),
-                                               emptyObj,
-                                               emptyObj,
-                                               emptyObj,
-                                               false,
-                                               false,
-                                               &lpq);
+                                               BSONObj(),  // hint
+                                               BSONObj(),  // min
+                                               BSONObj(),  // max
+                                               false,      // snapshot
+                                               baseQuery.getParsed().isExplain(),
+                                               &rawLpq);
     if (!parseStatus.isOK()) {
         return parseStatus;
     }
+    std::unique_ptr<LiteParsedQuery> lpq(rawLpq);
 
     // Make the CQ we'll hopefully return.
     auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-    Status initStatus = cq->init(lpq, whereCallback, root->shallowClone());
+    Status initStatus = cq->init(lpq.release(), whereCallback, root->shallowClone());
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -859,55 +857,6 @@ Status CanonicalQuery::isValid(MatchExpression* root, const LiteParsedQuery& par
     }
 
     return Status::OK();
-}
-
-// static
-// XXX TODO: This does not belong here at all.
-MatchExpression* CanonicalQuery::logicalRewrite(MatchExpression* tree) {
-    // Only thing we do is pull an OR up at the root.
-    if (MatchExpression::AND != tree->matchType()) {
-        return tree;
-    }
-
-    // We want to bail out ASAP if we have nothing to do here.
-    size_t numOrs = 0;
-    for (size_t i = 0; i < tree->numChildren(); ++i) {
-        if (MatchExpression::OR == tree->getChild(i)->matchType()) {
-            ++numOrs;
-        }
-    }
-
-    // Only do this for one OR right now.
-    if (1 != numOrs) {
-        return tree;
-    }
-
-    // Detach the OR from the root.
-    invariant(NULL != tree->getChildVector());
-    vector<MatchExpression*>& rootChildren = *tree->getChildVector();
-    MatchExpression* orChild = NULL;
-    for (size_t i = 0; i < rootChildren.size(); ++i) {
-        if (MatchExpression::OR == rootChildren[i]->matchType()) {
-            orChild = rootChildren[i];
-            rootChildren.erase(rootChildren.begin() + i);
-            break;
-        }
-    }
-
-    // AND the existing root with each or child.
-    invariant(NULL != orChild);
-    invariant(NULL != orChild->getChildVector());
-    vector<MatchExpression*>& orChildren = *orChild->getChildVector();
-    for (size_t i = 0; i < orChildren.size(); ++i) {
-        AndMatchExpression* ama = new AndMatchExpression();
-        ama->add(orChildren[i]);
-        ama->add(tree->shallowClone());
-        orChildren[i] = ama;
-    }
-    delete tree;
-
-    // Clean up any consequences from this tomfoolery.
-    return normalizeTree(orChild);
 }
 
 std::string CanonicalQuery::toString() const {

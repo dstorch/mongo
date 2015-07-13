@@ -28,6 +28,8 @@
 
 #include "mongo/db/query/canonical_query.h"
 
+#include <memory>
+
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
@@ -516,34 +518,6 @@ void assertEquivalent(const char* queryStr,
     FAIL(ss);
 }
 
-//
-// Tests for CanonicalQuery::logicalRewrite
-//
-
-// Don't do anything with a double OR.
-TEST(CanonicalQueryTest, RewriteNoDoubleOr) {
-    string queryStr = "{$or:[{a:1}, {b:1}], $or:[{c:1}, {d:1}], e:1}";
-    BSONObj queryObj = fromjson(queryStr);
-    auto_ptr<MatchExpression> base(parseMatchExpression(queryObj));
-    auto_ptr<MatchExpression> rewrite(CanonicalQuery::logicalRewrite(base->shallowClone()));
-    assertEquivalent(queryStr.c_str(), base.get(), rewrite.get());
-}
-
-// Do something with a single or.
-TEST(CanonicalQueryTest, RewriteSingleOr) {
-    // Rewrite of this...
-    string queryStr = "{$or:[{a:1}, {b:1}], e:1}";
-    BSONObj queryObj = fromjson(queryStr);
-    auto_ptr<MatchExpression> rewrite(
-        CanonicalQuery::logicalRewrite(parseMatchExpression(queryObj)));
-
-    // Should look like this.
-    string rewriteStr = "{$or:[{a:1, e:1}, {b:1, e:1}]}";
-    BSONObj rewriteObj = fromjson(rewriteStr);
-    auto_ptr<MatchExpression> base(parseMatchExpression(rewriteObj));
-    assertEquivalent(queryStr.c_str(), base.get(), rewrite.get());
-}
-
 /**
  * Test function for CanonicalQuery::normalize.
  */
@@ -684,5 +658,34 @@ TEST(PlanCacheTest, GetPlanCacheKeyGeoNear) {
         "{}",
         "{}",
         "gnanrsp");
+}
+
+TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
+    const bool isExplain = true;
+    const std::string cmdStr =
+        "{find:'bogusns', filter:{$or:[{a:1,b:1},{a:1,c:1}]}, projection:{a:1}, sort:{b:1}}";
+    LiteParsedQuery* rawLpq;
+    Status lpqStatus = LiteParsedQuery::make(ns, fromjson(cmdStr), isExplain, &rawLpq);
+    ASSERT_OK(lpqStatus);
+    std::unique_ptr<LiteParsedQuery> lpq(rawLpq);
+
+    CanonicalQuery* rawBaseCq;
+    Status baseCqStatus = CanonicalQuery::canonicalize(lpq.release(), &rawBaseCq);
+    ASSERT_OK(baseCqStatus);
+    std::unique_ptr<CanonicalQuery> baseCq(rawBaseCq);
+
+    MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
+    CanonicalQuery* rawChildCq;
+    Status childCqStatus = CanonicalQuery::canonicalize(*baseCq, firstClauseExpr, &rawChildCq);
+    ASSERT_OK(childCqStatus);
+    std::unique_ptr<CanonicalQuery> childCq(rawChildCq);
+
+    // Descriptive test. The childCq's filter should be the relevant $or clause, rather than the
+    // entire query predicate.
+    ASSERT_EQ(childCq->getParsed().getFilter(), baseCq->getParsed().getFilter());
+
+    ASSERT_EQ(childCq->getParsed().getProj(), baseCq->getParsed().getProj());
+    ASSERT_EQ(childCq->getParsed().getSort(), baseCq->getParsed().getSort());
+    ASSERT_TRUE(childCq->getParsed().isExplain());
 }
 }

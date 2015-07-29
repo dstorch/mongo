@@ -1018,6 +1018,14 @@ TEST(LiteParsedQueryTest, ParseCommandFirstFieldNotString) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(LiteParsedQueryTest, ParseCommandIgnoreMetadataField) {
+    BSONObj cmdObj = fromjson("{find: 'test.testns', metadata: {}}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
+    ASSERT_OK(result.getStatus());
+}
+
 TEST(LiteParsedQueryTest, DefaultQueryParametersCorrect) {
     BSONObj cmdObj = fromjson("{find: 'testns'}");
 

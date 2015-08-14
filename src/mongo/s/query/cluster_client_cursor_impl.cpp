@@ -35,13 +35,14 @@
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
 #include "mongo/s/query/router_stage_skip.h"
+#include "mongo/s/query/router_stage_tailable.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
                                                  ClusterClientCursorParams params)
-    : _root(buildMergerPlan(executor, std::move(params))) {}
+    : _isTailable(params.isTailable), _root(buildMergerPlan(executor, std::move(params))) {}
 
 StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
     return _root->next();
@@ -51,12 +52,32 @@ void ClusterClientCursorImpl::kill() {
     _root->kill();
 }
 
+bool ClusterClientCursorImpl::isTailable() const {
+    return _isTailable;
+}
+
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     executor::TaskExecutor* executor, ClusterClientCursorParams params) {
-    // The first stage is always the one which merges from the remotes.
-    auto leaf = stdx::make_unique<RouterStageMerge>(executor, params);
+    // The leaf stage is either a special stage for tailable cursors or, in the normal case, the
+    // stage that merges results from the shards.
+    std::unique_ptr<RouterExecStage> root;
+    if (params.isTailable) {
+        // Tailable cursors must act on capped collections and capped collections cannot be sharded.
+        // Therefore, we expect there to be only one remote node.
+        //
+        // TODO check invariant higher up. Do we want to check a sort invariant?
+        invariant(params.remotes.size() == 1U);
 
-    std::unique_ptr<RouterExecStage> root = std::move(leaf);
+        root = stdx::make_unique<RouterStageTailable>(executor,
+                                                      params.remotes[0].hostAndPort,
+                                                      params.nsString,
+                                                      params.remotes[0].cmdObj,
+                                                      params.batchSize);
+    }
+    else {
+        root = stdx::make_unique<RouterStageMerge>(executor, params);
+    }
+
     if (params.skip) {
         root = stdx::make_unique<RouterStageSkip>(std::move(root), *params.skip);
     }

@@ -26,37 +26,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+#pragma once
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/query/router_stage_limit.h"
+#include "mongo/db/query/getmore_response.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/s/query/async_batch_fetcher.h"
+#include "mongo/s/query/router_exec_stage.h"
 
 namespace mongo {
 
-RouterStageLimit::RouterStageLimit(std::unique_ptr<RouterExecStage> child, long long limit)
-    : RouterExecStage(std::move(child)), _limit(limit) {
-    invariant(limit > 0);
-}
+class RouterStageTailable final : public RouterExecStage {
+public:
+    RouterStageTailable(executor::TaskExecutor* executor,
+                        HostAndPort hostAndPort,
+                        NamespaceString nss,
+                        BSONObj cmdObj,
+                        boost::optional<long long> batchSize);
 
-StatusWith<boost::optional<BSONObj>> RouterStageLimit::next() {
-    if (_returnedSoFar >= _limit) {
-        return {boost::none};
-    }
+    StatusWith<boost::optional<BSONObj>> next() final;
 
-    auto childResult = getChildStage()->next();
-    if (!childResult.isOK()) {
-        return childResult;
-    }
+    void kill() final;
 
-    if (childResult.getValue()) {
-        ++_returnedSoFar;
-    }
-    return childResult;
-}
+private:
+    boost::optional<BSONObj> nextCachedResult();
 
-void RouterStageLimit::kill() {
-    getChildStage()->kill();
-}
+    // Not owned here.
+    executor::TaskExecutor* _executor;
+
+    AsyncBatchFetcher _abf;
+
+    boost::optional<GetMoreResponse> _getMoreResponse;
+
+    size_t _curResult = 0;
+};
 
 }  // namespace mongo

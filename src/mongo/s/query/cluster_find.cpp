@@ -123,6 +123,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     params.limit = query.getParsed().getLimit();
     params.sort = query.getParsed().getSort();
     params.skip = query.getParsed().getSkip();
+    params.isTailable = query.getParsed().isTailable();
 
     const auto lpqToForward = transformQueryForShards(query.getParsed());
 
@@ -173,7 +174,9 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
 
         if (!next.getValue()) {
             // We reached end-of-stream.
-            cursorState = ClusterCursorManager::CursorState::Exhausted;
+            if (!pinnedCursor.isTailable()) {
+                cursorState = ClusterCursorManager::CursorState::Exhausted;
+            }
             break;
         }
 
@@ -261,7 +264,9 @@ StatusWith<GetMoreResponse> ClusterFind::runGetMore(OperationContext* txn,
 
         if (!next.getValue()) {
             // We reached end-of-stream.
-            cursorState = ClusterCursorManager::CursorState::Exhausted;
+            if (!pinnedCursor.getValue().isTailable()) {
+                cursorState = ClusterCursorManager::CursorState::Exhausted;
+            }
             break;
         }
 

@@ -123,7 +123,7 @@ StatusWith<boost::optional<BSONObj>> AsyncResultsMerger::nextReady() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     dassert(ready_inlock());
     if (_lifecycleState != kAlive) {
-        return Status(ErrorCodes::IllegalOperation, "async cluster client cursor killed");
+        return Status(ErrorCodes::IllegalOperation, "AsyncResultsMerger killed");
     }
 
     if (!_status.isOK()) {
@@ -210,7 +210,7 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
     if (_lifecycleState != kAlive) {
         // Can't schedule further network operations if the ARM is being killed.
         return Status(ErrorCodes::IllegalOperation,
-                      "nextEvent() called on a killed async cluster client cursor");
+                      "nextEvent() called on a killed AsyncResultsMerger");
     }
 
     if (_currentEvent.isValid()) {
@@ -295,7 +295,7 @@ void AsyncResultsMerger::handleBatchResponse(
         return;
     }
 
-    auto getMoreResponse = getMoreParseStatus.getValue();
+    const auto getMoreResponse = std::move(getMoreParseStatus.getValue());
 
     // If we have a cursor established, and we get a non-zero cursorid that is not equal to the
     // established cursorid, we will fail the operation.

@@ -54,9 +54,9 @@ struct GetMoreResponse {
     BSONObj toBSON() const;
     void toBSON(BSONObjBuilder* builder) const;
 
-    const NamespaceString nss;
-    const CursorId cursorId;
-    const std::vector<BSONObj> batch;
+    NamespaceString nss;
+    CursorId cursorId;
+    std::vector<BSONObj> batch;
 };
 
 }  // namespace mongo

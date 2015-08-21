@@ -1,6 +1,10 @@
 f = db.jstests_update4;
 f.drop();
 
+// We don't want isMaster commands issued to infer the proper readMode to count towards
+// getPrevError().nPrev. Issue a query so that the shell caches its readMode.
+db.jstests_error1.findOne();
+
 getLastError = function() {
     ret = db.runCommand( { getlasterror : 1 } );
 //    printjson( ret );

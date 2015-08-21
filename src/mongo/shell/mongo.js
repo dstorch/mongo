@@ -297,6 +297,36 @@ Mongo.prototype.useReadCommands = function() {
 }
 
 /**
+ * For testing, forces the shell to use legacy OP_QUERY/OP_GET_MORE wire protocol reads. Has
+ * the same effect as starting the shell with "--readMode compatibility", but allows for runtime
+ * configuration.
+ */
+Mongo.prototype.forceReadModeCompatibility = function() {
+    this._readMode = "compatibility";
+}
+
+Mongo.prototype.hasReadCommands = function() {
+    if (!('_hasReadCommands' in this)) {
+        try {
+            var isMaster = this.getDB("admin").runCommand({isMaster: 1});
+            this._hasReadCommands = (isMaster.ok &&
+                                     'minWireVersion' in isMaster &&
+                                     'maxWireVersion' in isMaster &&
+                                     isMaster.minWireVersion <= 4 &&
+                                     4 <= isMaster.maxWireVersion);
+        }
+        catch (e) {
+            // We failed while trying to get the wire protocol version. Fall back on compatibility
+            // reads for now. Next time we need to answer a find, we'll try sending isMaster again
+            // to see if we can use read commands.
+            return false;
+        }
+    }
+
+    return this._hasReadCommands;
+}
+
+/**
  * Get the readMode string (either "commands" for find/getMore commands or "compatibility" for
  * OP_QUERY find and OP_GET_MORE).
  */
@@ -306,13 +336,15 @@ Mongo.prototype.readMode = function() {
         return this._readMode;
     }
 
-    // Determine read mode based on shell params.
-    //
-    // TODO: Detect what to use based on wire protocol version.
+    // Get the readMode from the shell params.
     if (_readMode) {
         this._readMode = _readMode();
     }
-    else {
+
+    // If the server supports the find/getMore commands, use whatever mode was specified as a shell
+    // param. Otherwise degrade to compatibility.
+    if (!this.hasReadCommands()) {
+        print("Cannot use commands readMode, degrading to compatibility mode");
         this._readMode = "compatibility";
     }
 

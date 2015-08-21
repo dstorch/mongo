@@ -1,5 +1,9 @@
 db.jstests_error1.drop();
 
+// We don't want isMaster commands issued to infer the proper readMode to count towards
+// getPrevError().nPrev. Issue a query so that the shell caches its readMode.
+db.jstests_error1.findOne();
+
 // test 1
 db.runCommand({reseterror:1});
 assert( db.runCommand({getlasterror:1}).err == null, "A" );

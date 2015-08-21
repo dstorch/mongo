@@ -670,7 +670,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --storageEngine=mmapv1
+      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=compatibility --storageEngine=mmapv1
 
 - <<: *task_template
   name: gle_auth_WT
@@ -678,7 +678,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=compatibility --storageEngine=wiredTiger
 
 - <<: *task_template
   name: gle_auth_write_cmd
@@ -702,7 +702,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --storageEngine=mmapv1
+      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=compatibility --storageEngine=mmapv1
 
 - <<: *task_template
   name: gle_auth_basics_passthrough_WT
@@ -710,7 +710,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=compatibility --storageEngine=wiredTiger
 
 - <<: *task_template
   name: gle_auth_basics_passthrough_write_cmd
@@ -750,7 +750,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --storageEngine=mmapv1
+      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=compatibility --storageEngine=mmapv1
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_WT
@@ -758,7 +758,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=compatibility --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_write_cmd

@@ -76,7 +76,7 @@ struct ShellGlobalParams {
         : autoKillOp(false),
           useWriteCommandsDefault(true),
           writeMode("commands"),
-          readMode("compatibility"),
+          readMode("commands"),
           rpcProtocols() {}
 };
 

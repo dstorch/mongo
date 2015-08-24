@@ -154,7 +154,8 @@ var DBExplainQuery = (function() {
                     innerCmd = this._query._convertToCountCmd(this._applySkipLimit);
                 }
                 else {
-                    innerCmd = this._query._convertToCommand();
+                    var canAttachReadPref = false;
+                    innerCmd = this._query._convertToCommand(canAttachReadPref);
                 }
 
                 var explainCmd = {explain: innerCmd};
@@ -167,7 +168,8 @@ var DBExplainQuery = (function() {
                     explainCmd = explainDb._attachReadPreferenceToCommand(explainCmd, prefObj);
                 }
 
-                var explainResult = explainDb.runCommand(explainCmd, null, this._query._options);
+                var explainResult =
+                    explainDb.runReadCommand(explainCmd, null, this._query._options);
 
                 if (!explainResult.ok && explainResult.code === CMD_NOT_FOUND_CODE) {
                     // One of the shards doesn't have the explain command available. Retry using

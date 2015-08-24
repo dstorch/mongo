@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/db/query/explain_common.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/strategy.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
@@ -47,13 +48,18 @@ public:
     /**
      * Given the BSON specification for a command, 'cmdObj', wraps the object in order to
      * produce the BSON for an explain of that command, at the given verbosity level
-     * 'verbosity'.
+     * 'verbosity' and according to the metadata in 'serverSelectionMetadata'.
      *
      * Adds the result to the BSONObj builder 'out'.
+     *
+     * Also uses 'serverSelectionMetdata' to set 'optionsOut' to the options bit vector that should
+     * be forwarded to the shards.
      */
     static void wrapAsExplain(const BSONObj& cmdObj,
                               ExplainCommon::Verbosity verbosity,
-                              BSONObjBuilder* out);
+                              const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                              BSONObjBuilder* out,
+                              int* optionsOut);
 
     /**
      * Determines the kind of "execution stage" that mongos would use in order to collect

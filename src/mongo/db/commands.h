@@ -41,6 +41,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/util/string_map.h"
@@ -176,6 +177,7 @@ public:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                            BSONObjBuilder* out) const {
         return Status(ErrorCodes::IllegalOperation, "Cannot explain cmd: " + name);
     }

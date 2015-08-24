@@ -205,4 +205,9 @@ var doTest = function(useDollarQuerySyntax) {
 };
 
 doTest(false);
-doTest(true);
+
+// The $-prefixed query syntax is only legal for compatibility mode reads, not for the find/getMore
+// commands.
+if (!db.getMongo().useReadCommands()) {
+    doTest(true);
+}

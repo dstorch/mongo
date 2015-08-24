@@ -55,6 +55,8 @@ namespace mongo {
 
 namespace {
 
+static const BSONObj kSortKeyMetaProjection = BSON("$meta" << "sortKey");
+
 /**
  * Given the LiteParsedQuery 'lpq' being executed by mongos, returns a copy of the query which is
  * suitable for forwarding to the targeted hosts.
@@ -66,9 +68,18 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
         newLimit = *lpq.getLimit() + lpq.getSkip().value_or(0);
     }
 
+    // If there is a sort, we send a sortKey meta-projection to the remote node.
+    BSONObj newProjection = lpq.getProj();
+    if (!lpq.getSort().isEmpty()) {
+        BSONObjBuilder projectionBuilder;
+        projectionBuilder.appendElements(lpq.getProj());
+        projectionBuilder.append(ClusterClientCursorParams::kSortKeyField, kSortKeyMetaProjection);
+        newProjection = projectionBuilder.obj();
+    }
+
     return LiteParsedQuery::makeAsFindCmd(lpq.nss(),
                                           lpq.getFilter(),
-                                          lpq.getProj(),
+                                          newProjection,
                                           lpq.getSort(),
                                           lpq.getHint(),
                                           boost::none,  // Don't forward skip.
@@ -120,7 +131,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     ClusterClientCursorParams params(query.nss());
     params.limit = query.getParsed().getLimit();
     params.batchSize = query.getParsed().getEffectiveBatchSize();
-    params.sort = query.getParsed().getSort();
+    params.sort = FindCommon::transformSortSpec(query.getParsed().getSort());
     params.skip = query.getParsed().getSkip();
     params.isTailable = query.getParsed().isTailable();
 

@@ -30,6 +30,7 @@ env.Library(
         "router_stage_limit.cpp",
         "router_stage_merge.cpp",
         "router_stage_mock.cpp",
+        "router_stage_remove_sortkey.cpp",
         "router_stage_skip.cpp",
     ],
     LIBDEPS=[
@@ -52,6 +53,7 @@ env.Library(
     target="async_results_merger",
     source=[
         "async_results_merger.cpp",
+        "cluster_client_cursor_params.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/command_request_response",

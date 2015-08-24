@@ -350,6 +350,15 @@ void AsyncResultsMerger::handleBatchResponse(
     remote.cursorId = getMoreResponse.cursorId;
 
     for (const auto& obj : getMoreResponse.batch) {
+        // If there's a sort, we're expecting the remote node to give us back a sort key.
+        if (!_params.sort.isEmpty() && !obj.hasField(ClusterClientCursorParams::kSortKeyField)) {
+            remote.status = Status(ErrorCodes::InternalError,
+                                   str::stream() << "Missing field '"
+                                                 << ClusterClientCursorParams::kSortKeyField
+                                                 << "' in document: " << obj);
+            return;
+        }
+
         remote.docBuffer.push(obj);
         ++remote.fetchedCount;
     }
@@ -494,7 +503,10 @@ bool AsyncResultsMerger::MergingComparator::operator()(const size_t& lhs, const 
     const BSONObj& leftDoc = _remotes[lhs].docBuffer.front();
     const BSONObj& rightDoc = _remotes[rhs].docBuffer.front();
 
-    return leftDoc.woSortOrder(rightDoc, _sort, true /*useDotted*/) > 0;
+    BSONObj leftDocKey = leftDoc[ClusterClientCursorParams::kSortKeyField].Obj();
+    BSONObj rightDocKey = rightDoc[ClusterClientCursorParams::kSortKeyField].Obj();
+
+    return leftDocKey.woSortOrder(rightDocKey, _sort, true /*useDotted*/) > 0;
 }
 
 }  // namespace mongo

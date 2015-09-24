@@ -491,10 +491,10 @@ public:
                 LOG(3) << "update result: " << res;
                 invariant(collection);
 
-                // The snapshot in which we update by _id should be the same snapshot from which we read the
-                // matching document. Therefore, we expect the update to successfully find a
-                // document to apply the update ops to. If this fails, then the _id index is likely
-                // missing the necessary index key.
+                // The snapshot in which we update by _id should be the same snapshot from which we
+                // read the matching document. Therefore, we expect the update to successfully find
+                // a document to apply the update ops to. If this fails, then the _id index is
+                // likely missing the necessary index key.
                 uassert(12344,
                         str::stream()
                             << "Failed to update document by _id: " << oldDoc

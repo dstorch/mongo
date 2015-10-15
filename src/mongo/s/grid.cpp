@@ -58,6 +58,21 @@ void Grid::init(std::unique_ptr<ForwardingCatalogManager> catalogManager,
     _catalogCache = stdx::make_unique<CatalogCache>();
     _shardRegistry = std::move(shardRegistry);
     _cursorManager = std::move(cursorManager);
+
+    for (size_t i = 0; i < 32; i++) {
+        auto network = executor::makeNetworkInterface();
+
+        ThreadPool::Options tpOptions;
+        auto executor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
+            stdx::make_unique<ThreadPool>(tpOptions), std::move(network));
+        executor->startup();
+        _executorPool.emplace_back(std::move(executor));
+    }
+}
+
+executor::TaskExecutor* Grid::getRandomExecutor() {
+    _counter = (_counter + 1) % 32;
+    return _executorPool[_counter].get();
 }
 
 StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(OperationContext* txn,

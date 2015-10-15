@@ -266,8 +266,12 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         params.remotes.emplace_back(shard->getId(), cmdBuilder.obj());
     }
 
-    auto ccc =
-        stdx::make_unique<ClusterClientCursorImpl>(shardRegistry->getExecutor(), std::move(params));
+    auto executor = shardRegistry->getExecutor();
+    if (query.nss() == std::string("test.foo")) {
+        executor = grid.getRandomExecutor();
+    }
+
+    auto ccc = stdx::make_unique<ClusterClientCursorImpl>(executor, std::move(params));
 
     // Register the cursor with the cursor manager.
     auto cursorManager = grid.getCursorManager();

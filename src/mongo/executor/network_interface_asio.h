@@ -91,10 +91,10 @@ public:
 #endif
 
         ConnectionPool::Options connectionPoolOptions;
-        std::unique_ptr<AsyncTimerFactoryInterface> timerFactory;
-        std::unique_ptr<NetworkConnectionHook> networkConnectionHook;
-        std::unique_ptr<AsyncStreamFactoryInterface> streamFactory;
-        std::unique_ptr<rpc::EgressMetadataHook> metadataHook;
+        AsyncTimerFactoryInterface* timerFactory;
+        NetworkConnectionHook* networkConnectionHook;
+        AsyncStreamFactoryInterface* streamFactory;
+        rpc::EgressMetadataHook* metadataHook;
     };
 
     NetworkInterfaceASIO(Options = Options());

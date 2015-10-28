@@ -53,7 +53,8 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface();
  */
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
     std::unique_ptr<NetworkConnectionHook> hook,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
+    size_t partitions = 32U);
 
 }  // namespace executor
 }  // namespace mongo

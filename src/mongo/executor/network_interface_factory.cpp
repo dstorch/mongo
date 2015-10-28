@@ -37,7 +37,7 @@
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/async_timer_asio.h"
 #include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface_asio.h"
+#include "mongo/executor/network_interface_asio_partitioned.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -46,13 +46,14 @@ namespace mongo {
 namespace executor {
 
 std::unique_ptr<NetworkInterface> makeNetworkInterface() {
-    return makeNetworkInterface(nullptr, nullptr);
+    return makeNetworkInterface(nullptr, nullptr, 1U);
 }
 
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
     std::unique_ptr<NetworkConnectionHook> hook,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
-    NetworkInterfaceASIO::Options options{};
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
+    size_t partitions) {
+    NetworkInterfaceASIOPartitioned::Options options{};
     options.networkConnectionHook = std::move(hook);
     options.metadataHook = std::move(metadataHook);
     options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
@@ -66,7 +67,7 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
     if (!options.streamFactory)
         options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
 
-    return stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
+    return stdx::make_unique<NetworkInterfaceASIOPartitioned>(partitions, std::move(options));
 }
 
 }  // namespace executor

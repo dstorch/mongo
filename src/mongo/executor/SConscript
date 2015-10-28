@@ -123,6 +123,15 @@ env.Library(target='network_test_env',
             ])
 
 env.Library(
+    target='network_interface_asio_partitioned',
+    source=[
+        'network_interface_asio_partitioned.cpp',
+    ],
+    LIBDEPS=[
+        'network_interface_asio',
+    ])
+
+env.Library(
     target='network_interface_asio',
     source=[
         'async_secure_stream.cpp',
@@ -196,6 +205,7 @@ env.Library(
     LIBDEPS=[
         'network_interface',
         'network_interface_asio',
+        'network_interface_asio_partitioned',
         'network_interface_impl',
     ])
 

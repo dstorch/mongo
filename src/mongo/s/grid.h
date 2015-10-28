@@ -35,6 +35,14 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
 
+// TODO
+#include <random>
+#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/s/client/sharding_network_connection_hook.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/util/concurrency/thread_pool.h"
+
 namespace mongo {
 
 class BSONObj;
@@ -127,11 +135,16 @@ public:
      */
     void clearForUnitTests();
 
+    executor::TaskExecutor* getRandomExecutor();
+
 private:
     std::unique_ptr<ForwardingCatalogManager> _catalogManager;
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;
+
+    size_t _counter = 0;
+    std::vector<std::unique_ptr<executor::TaskExecutor>> _executorPool;
 
     // can 'localhost' be used in shard addresses?
     bool _allowLocalShard;

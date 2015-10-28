@@ -99,6 +99,11 @@ std::string NetworkInterfaceASIO::getHostName() {
 }
 
 void NetworkInterfaceASIO::startup() {
+    stdx::lock_guard<stdx::mutex> lk(_isStartedUpMutex);
+    if (_isStartedUp) {
+        return;
+    }
+
     _serviceRunner = stdx::thread([this]() {
         setThreadName("NetworkInterfaceASIO");
         try {
@@ -112,6 +117,7 @@ void NetworkInterfaceASIO::startup() {
         }
     });
     _state.store(State::kRunning);
+    _isStartedUp = true;
 }
 
 void NetworkInterfaceASIO::shutdown() {

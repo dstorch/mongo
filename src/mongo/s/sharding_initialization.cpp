@@ -63,11 +63,10 @@ namespace {
 using executor::NetworkInterface;
 using executor::ThreadPoolTaskExecutor;
 
-std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
+std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(NetworkInterface* net) {
     ThreadPool::Options tpOptions;
     tpOptions.poolName = "ShardWork";
-    return stdx::make_unique<ThreadPoolTaskExecutor>(stdx::make_unique<ThreadPool>(tpOptions),
-                                                     std::move(net));
+    return stdx::make_unique<ThreadPoolTaskExecutor>(stdx::make_unique<ThreadPool>(tpOptions), net);
 }
 
 // Same logic as sharding_connection_hook.cpp.
@@ -134,12 +133,13 @@ Status initializeGlobalShardingState(OperationContext* txn,
         executor::makeNetworkInterface(stdx::make_unique<ShardingNetworkConnectionHook>(),
                                        stdx::make_unique<ShardingEgressMetadataHook>());
     auto networkPtr = network.get();
-    auto shardRegistry(
-        stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
-                                         makeTaskExecutor(std::move(network)),
-                                         networkPtr,
-                                         makeTaskExecutor(executor::makeNetworkInterface()),
-                                         configCS));
+    // TODO we're leaking the network interfaces.
+    auto shardRegistry(stdx::make_unique<ShardRegistry>(
+        stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
+        makeTaskExecutor(network.release()),
+        networkPtr,
+        makeTaskExecutor(executor::makeNetworkInterface().release()),
+        configCS));
 
     std::unique_ptr<ForwardingCatalogManager> catalogManager;
     try {

@@ -370,6 +370,9 @@ private:
 
     Options _options;
 
+    stdx::mutex _isStartedUpMutex;
+    bool _isStartedUp = false;
+
     asio::io_service _io_service;
     stdx::thread _serviceRunner;
 

@@ -57,7 +57,7 @@ public:
      * for network operations.
      */
     ThreadPoolTaskExecutor(std::unique_ptr<ThreadPoolInterface> pool,
-                           std::unique_ptr<NetworkInterface> net);
+                           NetworkInterface* net);
 
     /**
      * Destroys a ThreadPoolTaskExecutor.
@@ -137,7 +137,7 @@ private:
     void runCallback(std::shared_ptr<CallbackState> cbState);
 
     // The network interface used for remote command execution and waiting.
-    std::unique_ptr<NetworkInterface> _net;
+    NetworkInterface* _net;
 
     // The thread pool that executes scheduled work items.
     std::unique_ptr<ThreadPoolInterface> _pool;

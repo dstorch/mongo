@@ -114,8 +114,8 @@ public:
 };
 
 ThreadPoolTaskExecutor::ThreadPoolTaskExecutor(std::unique_ptr<ThreadPoolInterface> pool,
-                                               std::unique_ptr<NetworkInterface> net)
-    : _net(std::move(net)), _pool(std::move(pool)) {}
+                                               NetworkInterface* net)
+    : _net(net), _pool(std::move(pool)) {}
 
 ThreadPoolTaskExecutor::~ThreadPoolTaskExecutor() {}
 

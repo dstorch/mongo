@@ -291,6 +291,18 @@ struct DistinctScanStats : public SpecificStats {
     BSONObj keyPattern;
 };
 
+struct EnsureSortedStats : public SpecificStats {
+    EnsureSortedStats() : nDropped(0) {}
+
+    SpecificStats* clone() const final {
+        EnsureSortedStats* specific = new EnsureSortedStats(*this);
+        return specific;
+    }
+
+    // The number of out-of-order results that were dropped.
+    long long nDropped;
+};
+
 struct FetchStats : public SpecificStats {
     FetchStats() : alreadyHasObj(0), forcedFetches(0), matchTested(0), docsExamined(0) {}
 

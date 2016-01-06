@@ -50,6 +50,27 @@ using std::vector;
 // static
 const char* SortStage::kStageType = "SORT";
 
+BSONObj SortStageKeyGenerator::transformSortSpec(const BSONObj& sortSpec) {
+    BSONObjBuilder comparatorBob;
+
+    BSONObjIterator it(sortSpec);
+    while (it.more()) {
+        BSONElement elt = it.next();
+        if (elt.isNumber()) {
+            comparatorBob.append(elt);
+        } else if (LiteParsedQuery::isTextScoreMeta(elt)) {
+            // Sort text score decreasing by default.  Field name doesn't matter but we choose
+            // something that a user shouldn't ever have.
+            comparatorBob.append("$metaTextScore", -1);
+        } else {
+            // Sort spec. should have been validated before here.
+            verify(false);
+        }
+    }
+
+    return comparatorBob.obj();
+}
+
 SortStageKeyGenerator::SortStageKeyGenerator(const Collection* collection,
                                              const BSONObj& sortSpec,
                                              const BSONObj& queryObj) {
@@ -65,21 +86,13 @@ SortStageKeyGenerator::SortStageKeyGenerator(const Collection* collection,
     // key generator below as part of generating sort keys for the docs.
     BSONObjBuilder btreeBob;
 
-    // The pattern we use to woCompare keys.  Each field in 'sortSpec' will go in here with
-    // a value of 1 or -1.  The Btree key fields are verbatim, meta fields have a default.
-    BSONObjBuilder comparatorBob;
-
     BSONObjIterator it(sortSpec);
     while (it.more()) {
         BSONElement elt = it.next();
         if (elt.isNumber()) {
             // Btree key.  elt (should be) foo: 1 or foo: -1.
-            comparatorBob.append(elt);
             btreeBob.append(elt);
         } else if (LiteParsedQuery::isTextScoreMeta(elt)) {
-            // Sort text score decreasing by default.  Field name doesn't matter but we choose
-            // something that a user shouldn't ever have.
-            comparatorBob.append("$metaTextScore", -1);
             _sortHasMeta = true;
         } else {
             // Sort spec. should have been validated before here.
@@ -87,11 +100,11 @@ SortStageKeyGenerator::SortStageKeyGenerator(const Collection* collection,
         }
     }
 
-    // Our pattern for woComparing keys.
-    _comparatorObj = comparatorBob.obj();
-
     // The fake index key pattern used to generate Btree keys.
     _btreeObj = btreeBob.obj();
+
+    // Our pattern for woComparing keys.
+    _comparatorObj = transformSortSpec(sortSpec);
 
     // If we're just sorting by meta, don't bother with all the key stuff.
     if (_btreeObj.isEmpty()) {

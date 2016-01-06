@@ -30,15 +30,13 @@
 
 #include "mongo/db/exec/ensure_sorted.h"
 
+#include <memory>
+
 #include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/working_set_computed_data.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
-
-using std::unique_ptr;
-using stdx::make_unique;
 
 const char* EnsureSortedStage::kStageType = "ENSURE_SORTED";
 
@@ -46,8 +44,7 @@ EnsureSortedStage::EnsureSortedStage(OperationContext* opCtx,
                                      BSONObj pattern,
                                      WorkingSet* ws,
                                      PlanStage* child)
-    : PlanStage(kStageType, opCtx), _ws(ws) {
-    _children.emplace_back(child);
+    : _ws(ws), _child(child), _commonStats(kStageType) {
     _pattern = FindCommon::transformSortSpec(pattern);
 }
 
@@ -95,15 +92,42 @@ PlanStage::StageState EnsureSortedStage::work(WorkingSetID* out) {
     return stageState;
 }
 
-unique_ptr<PlanStageStats> EnsureSortedStage::getStats() {
-    _commonStats.isEOF = isEOF();
-    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_ENSURE_SORTED);
-    ret->specific = make_unique<EnsureSortedStats>(_specificStats);
-    ret->children.emplace_back(child()->getStats());
-    return ret;
+std::vector<PlanStage*> EnsureSortedStage::getChildren() const {
+    std::vector<PlanStage*> children;
+    children.push_back(_child.get());
+    return children;
 }
 
-const SpecificStats* EnsureSortedStage::getSpecificStats() const {
+void EnsureSortedStage::saveState() {
+    ++_commonStats.yields;
+    _child->saveState();
+}
+
+void EnsureSortedStage::restoreState(OperationContext* opCtx) {
+    ++_commonStats.unyields;
+    _child->restoreState(opCtx);
+}
+
+void EnsureSortedStage::invalidate(OperationContext* txn,
+                                   const RecordId& dl,
+                                   InvalidationType type) {
+    ++_commonStats.invalidates;
+    _child->invalidate(txn, dl, type);
+}
+
+PlanStageStats* EnsureSortedStage::getStats() {
+    _commonStats.isEOF = isEOF();
+    std::unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_ENSURE_SORTED));
+    ret->specific = make_unique<EnsureSortedStats>(_specificStats);
+    ret->children.emplace_back(child()->getStats());
+    return ret.release();
+}
+
+const CommonStats* KeepMutationsStage::getCommonStats() {
+    return &_commonStats;
+}
+
+const SpecificStats* EnsureSortedStage::getSpecificStats() {
     return &_specificStats;
 }
 

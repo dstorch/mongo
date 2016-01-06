@@ -50,9 +50,19 @@ public:
         return STAGE_ENSURE_SORTED;
     }
 
-    std::unique_ptr<PlanStageStats> getStats() final;
+    std::vector<PlanStage*> getChildren() const final;
 
-    const SpecificStats* getSpecificStats() const final;
+    void saveState() final;
+
+    void restoreState(OperationContext* opCtx) final;
+
+    void invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
+
+    PlanStageStats* getStats() final;
+
+    const CommonStats* getCommonStats() final;
+
+    const SpecificStats* getSpecificStats() final;
 
     static const char* kStageType;
 
@@ -65,11 +75,15 @@ private:
 
     WorkingSet* _ws;
 
+    std::unique_ptr<PlanStage> _child;
+
     // The pattern that we're sorting by.
     BSONObj _pattern;
 
     // The sort key of the previous result.
     BSONObj _prevSortKey;
+
+    CommonStats _commonStats;
 
     EnsureSortedStats _specificStats;
 };

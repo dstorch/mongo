@@ -57,9 +57,9 @@ struct CountScanParams {
 };
 
 /**
- * Used by the count command. Scans an index from a start key to an end key. Creates a
- * WorkingSetMember for each matching index key in OWNED_OBJ state. It has an owned empty object
- * with a null snapshot id rather than real data, since all we need is the count.
+ * Used by the count command. Scans an index from a start key to an end key. Does not create any
+ * WorkingSetMembers for the data, instead returning ADVANCED with an invalid WSM id in order to
+ * indicate to the caller that another result should be counted.
  *
  * Only created through the getExecutorCount() path, as count is the only operation that doesn't
  * care about its data.

@@ -95,12 +95,16 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         PlanStage::StageState state = child()->work(&id);
 
         if (PlanStage::ADVANCED == state) {
-            // Save result for later.
-            WorkingSetMember* member = _ws->get(id);
-            // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
-            member->makeObjOwnedIfNeeded();
-            _results.push_back(id);
+            // Count plans may advance without providing real data inside the WSM.
+            if (WorkingSet::INVALID_ID != id) {
+                // Save result for later.
+                WorkingSetMember* member = _ws->get(id);
+                // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we
+                // yield.
+                member->makeObjOwnedIfNeeded();
+            }
 
+            _results.push_back(id);
             if (_results.size() >= numResults) {
                 // Once a plan returns enough results, stop working. Update cache with stats
                 // from this run and return.
@@ -302,9 +306,11 @@ void CachedPlanStage::doInvalidate(OperationContext* txn,
                                    const RecordId& dl,
                                    InvalidationType type) {
     for (auto it = _results.begin(); it != _results.end(); ++it) {
-        WorkingSetMember* member = _ws->get(*it);
-        if (member->hasRecordId() && member->recordId == dl) {
-            WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
+        if (WorkingSet::INVALID_ID != *it) {
+            WorkingSetMember* member = _ws->get(*it);
+            if (member->hasRecordId() && member->recordId == dl) {
+                WorkingSetCommon::fetchAndInvalidateRecordId(txn, member, _collection);
+            }
         }
     }
 }

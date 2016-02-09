@@ -235,6 +235,75 @@ public:
     }
 };
 
+/**
+ * Test that the cached plan stage works correctly in the case that, on ADVANCED, the child stage
+ * provides invalid working set ids. This will be the case for some count plans where the client
+ * doesn't need the actual data.
+ */
+class QueryStageCachedPlanAllowsInvalidWSID : public QueryStageCachedPlanBase {
+public:
+    void run() {
+        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        Collection* collection = ctx.getCollection();
+        ASSERT(collection);
+
+        // We need a query to pass to the CachedPlanStage, but the contents of the query aren't
+        // relevant for this test.
+        auto cq = unittest::assertGet(
+            CanonicalQuery::canonicalize(nss, BSONObj(), ExtensionsCallbackDisallowExtensions()));
+
+        // Queued data stage will advance 10 times, each time returning an invalid WSID.
+        auto mockChild = stdx::make_unique<QueuedDataStage>(&_txn, &_ws);
+        for (size_t i = 0; i < 10U; i++) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            mockChild->pushBack(id);
+        }
+
+        // High enough so that we shouldn't trigger a replan based on works.
+        const size_t decisionWorks = 50;
+        QueryPlannerParams plannerParams;
+        CachedPlanStage cachedPlanStage(
+            &_txn, collection, &_ws, cq.get(), plannerParams, decisionWorks, mockChild.release());
+
+        // Get the first 5 results back.
+        size_t numResults = 0;
+        while (numResults < 5) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = cachedPlanStage.work(&id);
+
+            ASSERT_NE(state, PlanStage::FAILURE);
+            ASSERT_NE(state, PlanStage::DEAD);
+
+            if (state == PlanStage::ADVANCED) {
+                WorkingSetID invalidId = WorkingSet::INVALID_ID;
+                ASSERT_EQ(id, invalidId);
+                numResults++;
+            }
+        }
+
+        // Ensure that we don't attempt to retrieve an invalid working set member on invalidation.
+        cachedPlanStage.invalidate(&_txn, RecordId(), INVALIDATION_MUTATION);
+        cachedPlanStage.invalidate(&_txn, RecordId(), INVALIDATION_DELETION);
+
+        // Get the last 5 results back.
+        while (numResults < 10) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            PlanStage::StageState state = cachedPlanStage.work(&id);
+
+            ASSERT_NE(state, PlanStage::FAILURE);
+            ASSERT_NE(state, PlanStage::DEAD);
+
+            if (state == PlanStage::ADVANCED) {
+                WorkingSetID invalidId = WorkingSet::INVALID_ID;
+                ASSERT_EQ(id, invalidId);
+                numResults++;
+            }
+        }
+
+        ASSERT(cachedPlanStage.isEOF());
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("query_stage_cached_plan") {}
@@ -242,6 +311,7 @@ public:
     void setupTests() {
         add<QueryStageCachedPlanFailure>();
         add<QueryStageCachedPlanHitMaxWorks>();
+        add<QueryStageCachedPlanAllowsInvalidWSID>();
     }
 };
 

@@ -31,7 +31,7 @@ rm -rf $TEMP_DIR
 mv $TARBALL_DIR $TEMP_DIR
 
 # Copy all sources into their proper place in the mongo source tree.
-if [ ! -f $DEST_DIR ]; then
+if [ ! -d $DEST_DIR ]; then
     mkdir $DEST_DIR
 fi
 

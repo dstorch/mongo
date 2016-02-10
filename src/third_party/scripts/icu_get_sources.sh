@@ -30,6 +30,13 @@ tar -zxvf $TARBALL
 rm -rf $TEMP_DIR
 mv $TARBALL_DIR $TEMP_DIR
 
+# If the SConscript for building ICU already exists, move it into the temporary directory.
+if [ -f $DEST_DIR/source/SConscript ]; then
+    echo "Saving SConscript"
+    mv $DEST_DIR/source/SConscript $TEMP_DIR/source
+    rm -rf $DEST_DIR
+fi
+
 # Copy all sources into their proper place in the mongo source tree.
 if [ ! -d $DEST_DIR ]; then
     mkdir $DEST_DIR

@@ -351,6 +351,11 @@ add_option('use-system-asio',
     nargs=0,
 )
 
+add_option('use-system-icu',
+    help="use system version of ICU",
+    nargs=0,
+)
+
 add_option('use-system-intel_decimal128',
     help='use system version of intel decimal128',
     nargs=0,

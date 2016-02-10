@@ -78,8 +78,9 @@ if not use_system_version_of_library('intel_decimal128'):
     thirdPartyIncludePathList.append(
         ('intel_decimal128', '#/src/third_party/IntelRDFPMathLib20U1/LIBRARY'))
 
-thirdPartyIncludePathList.append(
-    ('icu', '#/src/third_party/icu4c' + icuSuffix + '/source'))
+if not use_system_version_of_library('icu'):
+    thirdPartyIncludePathList.append(
+        ('icu', '#/src/third_party/icu4c' + icuSuffix + '/source'))
 
 def injectAllThirdPartyIncludePaths(thisEnv):
     thisEnv.PrependUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
@@ -361,10 +362,20 @@ if get_option("experimental-decimal-support") == "on":
             'shim_intel_decimal128.cpp'
         ])
 
-icuEnv = env.Clone()
-icuEnv.InjectThirdPartyIncludePaths(libraries=['icu'])
-icuEnv.SConscript('icu4c' + icuSuffix + '/source/SConscript', exports={ 'env' : icuEnv })
-icuEnv = icuEnv.Clone(
-    LIBDEPS=[
-        'icu4c' + icuSuffix + '/source/icu',
+if use_system_version_of_library('icu'):
+    # TODO
+    icuEnv = env.Clone()
+else:
+    icuEnv = env.Clone()
+    icuEnv.InjectThirdPartyIncludePaths(libraries=['icu'])
+    icuEnv.SConscript('icu4c' + icuSuffix + '/source/SConscript', exports={ 'env' : icuEnv })
+    icuEnv = icuEnv.Clone(
+        LIBDEPS=[
+            'icu4c' + icuSuffix + '/source/icu',
+        ])
+
+icuEnv.Library(
+    target='shim_icu',
+    source=[
+        'shim_icu.cpp',
     ])

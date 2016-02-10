@@ -4,14 +4,16 @@ Import('env')
 
 env = env.Clone()
 
-env.Append(CPPDEFINES=['U_USING_ICU_NAMESPACE=0', 'U_STATIC_IMPLEMENTATION=1'], CPPPATH=['common'])
-
-env.Library(
-    target='icu',
-    LIBDEPS=[
-        'icu_common',
-        'icu_i18n',
+env.Append(
+    CPPDEFINES=[
+        'U_USING_ICU_NAMESPACE=0',
+        'U_STATIC_IMPLEMENTATION=1',
+        'U_I18N_IMPLEMENTATION=1',
     ],
+    CPPPATH=[
+        'common',
+        'i18n',
+    ]
 )
 
 def removeIfPresent(lst, item):
@@ -23,11 +25,7 @@ def removeIfPresent(lst, item):
 for to_remove in ['-Werror', '-Wall', '-W']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
-i18nEnv = env.Clone()
-
-i18nEnv.Append(CPPDEFINES=['U_I18N_IMPLEMENTATION=1'], CPPPATH=['i18n'])
-
-i18nEnv.Library(
+env.Library(
     target='icu_i18n',
     source=[
         'i18n/affixpatternparser.cpp',
@@ -228,7 +226,10 @@ i18nEnv.Library(
         'i18n/zonemeta.cpp',
         'i18n/zrule.cpp',
         'i18n/ztrans.cpp',
-    ]
+    ],
+    LIBDEPS=[
+        'icu_common',
+    ],
 )
 
 commonEnv = env.Clone()
@@ -418,5 +419,17 @@ commonEnv.Library(
         'common/uvectr32.cpp',
         'common/uvectr64.cpp',
         'common/wintz.c',
-    ]
+    ],
+    LIBDEPS=[
+        'icu_data',
+    ],
+)
+
+icuDataEnv = env.Clone()
+
+icuDataEnv.Library(
+    target='icu_data',
+    source=[
+        'stubdata/stubdata.c',
+    ],
 )

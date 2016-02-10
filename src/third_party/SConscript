@@ -371,7 +371,7 @@ else:
     icuEnv.SConscript('icu4c' + icuSuffix + '/source/SConscript', exports={ 'env' : icuEnv })
     icuEnv = icuEnv.Clone(
         LIBDEPS=[
-            'icu4c' + icuSuffix + '/source/icu',
+            'icu4c' + icuSuffix + '/source/icu_i18n',
         ])
 
 icuEnv.Library(

@@ -20,7 +20,7 @@ DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION
 # Download and extract tarball.
 if [ ! -f $TARBALL ]; then
     echo "Get tarball"
-    wget $TARBALL_DOWNLOAD_URL
+    curl -O $TARBALL_DOWNLOAD_URL
 fi
 
 echo $TARBALL

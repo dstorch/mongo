@@ -1,0 +1,42 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.InjectThirdPartyIncludePaths("icu")
+
+env.Append(
+    CPPDEFINES=[
+        'U_USING_ICU_NAMESPACE=0',
+    ],
+)
+
+env.Library(
+    target="collator_interface",
+    source=[
+        "collator_interface.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
+env.Library(
+    target="collator_interface_icu",
+    source=[
+        "collator_interface_icu.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/third_party/shim_icu",
+        "collator_interface"
+    ],
+)
+
+env.CppUnitTest(
+    target="collator_interface_icu_test",
+    source=[
+        "collator_interface_icu_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_interface_icu",
+    ],
+)

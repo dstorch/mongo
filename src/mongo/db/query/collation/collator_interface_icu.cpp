@@ -44,6 +44,7 @@ int CollatorInterfaceICU::compare(StringData left, StringData right) {
     auto compareResult = _collator->compare(icu::UnicodeString(left.rawData(), left.size()),
                                             icu::UnicodeString(right.rawData(), right.size()),
                                             status);
+    invariant(U_SUCCESS(status));
 
     return compareResult;
 }

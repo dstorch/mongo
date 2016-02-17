@@ -30,6 +30,8 @@
 
 #include "mongo/db/query/collation/collator_factory_icu.h"
 
+#include <unicode/errorcode.h>
+
 #include "mongo/db/query/collation/collator_interface_icu.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
@@ -81,8 +83,10 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> icuCollator(icu::Collator::createInstance(locale, status));
     if (U_FAILURE(status)) {
+        icu::ErrorCode icuError;
+        icuError.set(status);
         return {ErrorCodes::OperationFailed,
-                str::stream() << "Failed to create collator with code: " << status
+                str::stream() << "Failed to create collator: " << icuError.errorName()
                               << ". Collation spec: " << spec};
     }
 

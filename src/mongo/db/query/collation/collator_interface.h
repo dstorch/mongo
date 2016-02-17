@@ -30,13 +30,15 @@
 
 #include <cstdint>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/collation/collation_spec.h"
 
 namespace mongo {
 
 /**
- * An interface for ordering and matching according to a collation.
+ * An interface for ordering and matching according to a collation. Instances should be retrieved
+ * from the CollatorFactoryInterface and may not be copied.
  *
  * All methods are thread-safe.
  *
@@ -46,6 +48,8 @@ namespace mongo {
  * abstraction for a collator-generated comparison key.
  */
 class CollatorInterface {
+    MONGO_DISALLOW_COPYING(CollatorInterface);
+
 public:
     /**
      * Constructs a CollatorInterface capable of computing the collation described by 'spec'.

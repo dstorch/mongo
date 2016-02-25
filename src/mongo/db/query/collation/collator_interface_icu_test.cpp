@@ -69,6 +69,34 @@ TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksUsingLocaleStringParsing) {
     ASSERT_EQ(icuCollator.compare("ab", "ab"), 0);
 }
 
+TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksUsingComparisonKeys) {
+    CollationSpec collationSpec;
+    collationSpec.localeID = "en_US";
+
+    auto locale = icu::Locale::createFromName(collationSpec.localeID.c_str());
+    ASSERT_EQ(std::string("en"), locale.getLanguage());
+    ASSERT_EQ(std::string("US"), locale.getCountry());
+
+    UErrorCode status = U_ZERO_ERROR;
+    std::unique_ptr<icu::Collator> coll(icu::Collator::createInstance(locale, status));
+    ASSERT(U_SUCCESS(status));
+
+    CollatorInterfaceICU icuCollator(collationSpec, std::move(coll));
+    const auto comparisonKeyAB = icuCollator.getComparisonKey("ab");
+    const auto comparisonKeyABB = icuCollator.getComparisonKey("abb");
+    const auto comparisonKeyBA = icuCollator.getComparisonKey("ba");
+
+    ASSERT_LT(comparisonKeyAB.compare(comparisonKeyBA), 0);
+    ASSERT_GT(comparisonKeyBA.compare(comparisonKeyAB), 0);
+    ASSERT_EQ(comparisonKeyAB.compare(comparisonKeyAB), 0);
+
+    ASSERT_LT(comparisonKeyAB.compare(comparisonKeyABB), 0);
+    ASSERT_GT(comparisonKeyABB.compare(comparisonKeyAB), 0);
+
+    ASSERT_GT(comparisonKeyBA.compare(comparisonKeyABB), 0);
+    ASSERT_LT(comparisonKeyABB.compare(comparisonKeyBA), 0);
+}
+
 TEST(CollatorInterfaceICUTest, TwoUSEnglishCollationsAreEqual) {
     CollationSpec collationSpec;
     collationSpec.localeID = "en_US";

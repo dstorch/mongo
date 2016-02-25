@@ -30,6 +30,8 @@
 
 #include "mongo/db/query/collation/collator_interface_icu.h"
 
+#include <unicode/sortkey.h>
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -47,6 +49,23 @@ int CollatorInterfaceICU::compare(StringData left, StringData right) {
     invariant(U_SUCCESS(status));
 
     return compareResult;
+}
+
+CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(StringData stringData) {
+    // TODO: What happens if 'status' is a failure code? In what circumstances could this happen?
+    UErrorCode status = U_ZERO_ERROR;
+    icu::CollationKey icuKey;
+    _collator->getCollationKey(
+        icu::UnicodeString(stringData.rawData(), stringData.size()), icuKey, status);
+    invariant(U_SUCCESS(status));
+
+    int32_t keyLength;
+    const uint8_t* keyBuffer = icuKey.getByteArray(keyLength);
+    invariant(keyLength > 0);
+    invariant(keyBuffer);
+
+    const char* charBuffer = static_cast<const char*>(static_cast<const void*>(keyBuffer));
+    return makeComparisonKey(std::string(charBuffer, keyLength));
 }
 
 }  // namespace mongo

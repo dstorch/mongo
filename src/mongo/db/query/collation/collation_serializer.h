@@ -28,19 +28,32 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
 
 class BSONObj;
+class BSONObjBuilder;
 
-class CollationSpecSerializer {
+/**
+ * Provides functions for serializing collation-related objects.
+ */
+class CollationSerializer {
 public:
     /**
-     * Converts 'spec' to its BSONObj representation. The resulting BSON can be stored and later
-     * used to recreate the corresponding CollatorInterface.
+     * Converts CollationSpec 'spec' to its BSONObj representation. The resulting BSON can be stored
+     * and later used to recreate the corresponding CollatorInterface.
      */
-    static BSONObj toBSON(const CollationSpec& spec);
+    static BSONObj specToBSON(const CollationSpec& spec);
+
+    /**
+     * Appends 'key' to 'bob' as a BSONElement of BSONType string with field name 'fieldName'.
+     */
+    static void appendCollationKey(StringData fieldName,
+                                   const CollatorInterface::ComparisonKey& key,
+                                   BSONObjBuilder* bob);
 };
 
 }  // namespace mongo

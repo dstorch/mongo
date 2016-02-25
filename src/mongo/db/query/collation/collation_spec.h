@@ -34,7 +34,7 @@ namespace mongo {
 
 /**
  * A CollationSpec is a parsed representation of a user-provided collation BSONObj. Can be
- * re-serialized to BSON using the CollationSpecSerializer.
+ * re-serialized to BSON using CollationSerializer.
  *
  * TODO SERVER-22373: extend to support options other than the localeID.
  */

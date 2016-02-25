@@ -81,4 +81,24 @@ TEST(CollatorFactoryICUTest, FactoryMadeCollatorComparesStringsCorrectlyEnUS) {
     ASSERT_EQ(collator.getValue()->compare("ab", "ab"), 0);
 }
 
+TEST(CollatorInterfaceICUTest, FactoryMadeCollatorComparisonKeysCorrectEnUS) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"));
+    ASSERT_OK(collator.getStatus());
+    const auto comparisonKeyAB = collator.getValue()->getComparisonKey("ab");
+    const auto comparisonKeyABB = collator.getValue()->getComparisonKey("abb");
+    const auto comparisonKeyBA = collator.getValue()->getComparisonKey("ba");
+
+    ASSERT_LT(comparisonKeyAB.compare(comparisonKeyBA), 0);
+    ASSERT_GT(comparisonKeyBA.compare(comparisonKeyAB), 0);
+    ASSERT_EQ(comparisonKeyAB.compare(comparisonKeyAB), 0);
+
+    ASSERT_LT(comparisonKeyAB.compare(comparisonKeyABB), 0);
+    ASSERT_GT(comparisonKeyABB.compare(comparisonKeyAB), 0);
+
+    ASSERT_GT(comparisonKeyBA.compare(comparisonKeyABB), 0);
+    ASSERT_LT(comparisonKeyABB.compare(comparisonKeyBA), 0);
+}
+
 }  // namespace

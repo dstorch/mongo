@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/collation/collation_spec_serializer.h"
+#include "mongo/db/query/collation/collation_serializer.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/unittest.h"
@@ -37,14 +37,14 @@ namespace {
 
 using namespace mongo;
 
-TEST(CollationSpecSerializerTest, ToBSONProducesCorrectSerializedObj) {
+TEST(CollationSerializerTest, SpecToBSONProducesCorrectSerializedObj) {
     CollationSpec collationSpec;
     collationSpec.localeID = "myLocale";
 
     BSONObj expectedObj = BSON("locale"
                                << "myLocale");
 
-    ASSERT_EQ(expectedObj, CollationSpecSerializer::toBSON(collationSpec));
+    ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
 }  // namespace

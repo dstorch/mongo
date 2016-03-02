@@ -39,7 +39,7 @@ namespace mongo {
  * An implementation of the CollatorInterface which is backed by the implementation of collations
  * from the ICU library.
  */
-class CollatorInterfaceICU : public CollatorInterface {
+class CollatorInterfaceICU final : public CollatorInterface {
 public:
     CollatorInterfaceICU(CollationSpec spec, std::unique_ptr<icu::Collator> collator);
 

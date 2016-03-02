@@ -28,40 +28,41 @@
 
 #pragma once
 
-#include <string>
+#include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
 
 /**
- * A CollationSpec is a parsed representation of a user-provided collation BSONObj. Can be
- * re-serialized to BSON using CollationSerializer.
- *
- * TODO SERVER-22373: extend to support options other than the localeID.
+ * An implementation of the CollatorInterface used for testing that does not depend on the ICU
+ * library.
  */
-struct CollationSpec {
-    // Field name constants.
-    static const char* kLocaleField;
+class CollatorInterfaceMock final : public CollatorInterface {
+public:
+    /**
+     * The mock can compute a number of artificial collations. A test can request a particular
+     * kind of mock collator and then assert that it obtains the mock behavior.
+     */
+    enum class MockType {
+        // Compares strings after reversing them. For example, the comparison key for "abc" is
+        // "cba".
+        kReverseString,
+
+        // Considers all strings equal.
+        kAlwaysEqual,
+    };
 
     /**
-     * Constructs a CollationSpec for the given locale, where all other fields have their default
-     * values.
+     * Constructs a mock collator which computes the collation described by 'mockType'. The
+     * collator's spec will have a fake locale string such as "mock_reverse".
      */
-    CollationSpec(std::string locale) : localeID(std::move(locale)) {}
+    CollatorInterfaceMock(MockType mockType);
 
-    // A string such as "en_US", identifying the language, country, or other attributes of the
-    // locale for this collation.
-    std::string localeID;
+    int compare(StringData left, StringData right) final;
+
+    ComparisonKey getComparisonKey(StringData stringData) final;
+
+private:
+    const MockType _mockType;
 };
-
-/**
- * Returns whether 'left' and 'right' are logically equivalent collations.
- */
-inline bool operator==(const CollationSpec& left, const CollationSpec& right) {
-    return left.localeID == right.localeID;
-}
-
-inline bool operator!=(const CollationSpec& left, const CollationSpec& right) {
-    return !(left == right);
-}
 
 }  // namespace mongo

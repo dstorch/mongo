@@ -42,6 +42,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/log_builder.h"
+#include "mongo/db/ops/path_support.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -150,6 +151,14 @@ void combineAndSortVec(const vector<BSONObj>& origVec,
         combined->erase(combined->begin(), combined->begin() + removeCount);
     } else {
         combined->resize(std::min(combined->size(), size_t(slice)));
+    }
+}
+
+// Pads 'elemArray' with 'numPadElements' nulls.
+void padWithElements(size_t numPadElements, Element* elemArray) {
+    invariant(elemArray->getType() == mongo::Array);
+    for (size_t i = 0; i < numPadElements; ++i) {
+        invariantOK(elemArray->appendNull(""));
     }
 }
 
@@ -583,6 +592,36 @@ TEST(SimpleMod, PrepareApplyNormal) {
     ASSERT_EQUALS(fromjson("{$set: {'a.1':1}}"), logDoc);
 }
 
+TEST(SimpleMod, ApplyFailsWhenArrayIsAlreadyMaxLength) {
+    Document doc(fromjson("{a: []}"));
+    Element arrayElem = doc.root().leftChild();
+    padWithElements(mongo::pathsupport::kMaxArrayElems, &arrayElem);
+
+    Mod pushMod(fromjson("{$push: {a: 1}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    Status prepareStatus = pushMod.prepare(doc.root(), "", &execInfo);
+    ASSERT_NOT_OK(prepareStatus);
+    ASSERT_EQ(prepareStatus, mongo::ErrorCodes::CannotBackfillArray);
+}
+
+TEST(SimpleMod, ApplySucceedsWhenArrayIsMaxLengthMinusOne) {
+    Document doc(fromjson("{a: []}"));
+    Element arrayElem = doc.root().leftChild();
+    padWithElements(mongo::pathsupport::kMaxArrayElems - 1, &arrayElem);
+
+    Mod pushMod(fromjson("{$push: {a: 1}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_EQ(countChildren(doc.root().leftChild()), mongo::pathsupport::kMaxArrayElems);
+}
+
 //
 // Simple object mod
 //
@@ -760,6 +799,53 @@ TEST(PushAll, PrepareApplyNormal) {
     ASSERT_EQUALS(logDoc, fromjson("{$set: {'a.1': 1, 'a.2':2}}"));
 }
 
+TEST(PushAll, PushAllFailsWhenItWouldExtendArrayBeyondMaxLength) {
+    Document doc(fromjson("{a: []}"));
+    Element arrayElem = doc.root().leftChild();
+    padWithElements(mongo::pathsupport::kMaxArrayElems - 2, &arrayElem);
+
+    Mod pushMod(fromjson("{$pushAll: {a: [1, 2, 3]}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    Status prepareStatus = pushMod.prepare(doc.root(), "", &execInfo);
+    ASSERT_NOT_OK(prepareStatus);
+    ASSERT_EQ(prepareStatus, mongo::ErrorCodes::CannotBackfillArray);
+}
+
+TEST(PushAll, PushAllSucceedsWhenItWouldExtendArrayToMaxLength) {
+    Document doc(fromjson("{a: []}"));
+    Element arrayElem = doc.root().leftChild();
+    padWithElements(mongo::pathsupport::kMaxArrayElems - 2, &arrayElem);
+
+    Mod pushMod(fromjson("{$pushAll: {a: [1, 2]}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_EQ(countChildren(doc.root().leftChild()), mongo::pathsupport::kMaxArrayElems);
+}
+
+TEST(PushAll, EmptyPushAllSucceedsAgainstMaxLengthArray) {
+    Document doc(fromjson("{a: []}"));
+    Element arrayElem = doc.root().leftChild();
+    padWithElements(mongo::pathsupport::kMaxArrayElems, &arrayElem);
+
+    Mod pushMod(fromjson("{$pushAll: {a: []}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_EQ(countChildren(doc.root().leftChild()), mongo::pathsupport::kMaxArrayElems);
+}
+
 //
 // Simple $each mod
 //
@@ -875,6 +961,53 @@ TEST(SimpleEachMod, PrepareApplyNormalMultiple) {
     ASSERT_OK(pushMod.log(&logBuilder));
     ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
     ASSERT_EQUALS(fromjson("{$set: {'a.1': 1, 'a.2':2}}"), logDoc);
+}
+
+TEST(SimpleEachMod, EachFailsWhenItWouldExtendArrayBeyondMaxLength) {
+    Document doc(fromjson("{a: []}"));
+    Element arrayElem = doc.root().leftChild();
+    padWithElements(mongo::pathsupport::kMaxArrayElems - 2, &arrayElem);
+
+    Mod pushMod(fromjson("{$push: {a: {$each: [1, 2, 3]}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    Status prepareStatus = pushMod.prepare(doc.root(), "", &execInfo);
+    ASSERT_NOT_OK(prepareStatus);
+    ASSERT_EQ(prepareStatus, mongo::ErrorCodes::CannotBackfillArray);
+}
+
+TEST(SimpleEachMod, EachSucceedsWhenItWouldExtendArrayToMaxLength) {
+    Document doc(fromjson("{a: []}"));
+    Element arrayElem = doc.root().leftChild();
+    padWithElements(mongo::pathsupport::kMaxArrayElems - 2, &arrayElem);
+
+    Mod pushMod(fromjson("{$push: {a: {$each: [1, 2]}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_EQ(countChildren(doc.root().leftChild()), mongo::pathsupport::kMaxArrayElems);
+}
+
+TEST(SimpleEachMod, EmptyEachSucceedsAgainstMaxLengthArray) {
+    Document doc(fromjson("{a: []}"));
+    Element arrayElem = doc.root().leftChild();
+    padWithElements(mongo::pathsupport::kMaxArrayElems, &arrayElem);
+
+    Mod pushMod(fromjson("{$push: {a: {$each: []}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+    ASSERT_FALSE(execInfo.noOp);
+
+    ASSERT_OK(pushMod.apply());
+    ASSERT_EQ(countChildren(doc.root().leftChild()), mongo::pathsupport::kMaxArrayElems);
 }
 
 /**
@@ -1010,6 +1143,185 @@ TEST(SortPushEach, MixedSortEmbeddedField) {
     ASSERT_OK(pushMod.log(&logBuilder));
     ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
     ASSERT_EQUALS(BSON("$set" << expectedObj), logDoc);
+}
+
+/**
+ * Tests that arraySizeAfterApply() computes what the final size of the array will be correctly.
+ */
+TEST(ArraySizeAfterApplyTest, PushSingleElementIntoEmptyDoc) {
+    Document doc(fromjson("{}"));
+    Mod pushMod(fromjson("{$push: {a: 1}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(1u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushAllFiveElementsIntoEmptyDoc) {
+    Document doc(fromjson("{}"));
+    Mod pushMod(fromjson("{$pushAll: {a: [1, 2, 3, 4, 5]}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(5u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushEachFiveElementsIntoEmptyDoc) {
+    Document doc(fromjson("{}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [1, 2, 3, 4, 5]}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(5u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOneOntoExistingArray) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$push: {a: 4}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(4u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushAllOntoExistingArray) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$pushAll: {a: [4, 5, 6, 7]}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(7u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushEachOntoExistingArray) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4, 5, 6, 7]}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(7u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOntoEmptyDocAndSliceEverythingFromEnd) {
+    Document doc(fromjson("{}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4, 5, 6], $slice: 3}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOntoEmptyDocAndSliceEverythingFromEnd2) {
+    Document doc(fromjson("{}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4, 5, 6], $slice: 5}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOntoEmptyDocAndSliceEverythingFromBeginning) {
+    Document doc(fromjson("{}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4, 5, 6], $slice: -3}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOntoEmptyDocAndSliceEverythingFromBeginning2) {
+    Document doc(fromjson("{}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4, 5, 6], $slice: -5}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOntoEmptyDocWithSliceValue0) {
+    Document doc(fromjson("{}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4, 5, 6], $slice: 0}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOntoExistingArrayAndSliceEverythingFromBeginning) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4], $slice: 4}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOntoExistingArrayAndSliceEverythingFromBeginning2) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4], $slice: 5}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOntoExistingArrayAndSliceEverythingFromEnd) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4], $slice: -4}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOntoExistingArrayAndSliceEverythingFromEnd2) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4], $slice: -5}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOntoExistingArrayWithSliceValueZero) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [4], $slice: 0}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, SliceFromBeginningWithoutPush) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [], $slice: 2}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(1u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, SliceFromEndWithoutPush) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [], $slice: -2}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(1u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, SliceZeroWithoutPush) {
+    Document doc(fromjson("{a: [1, 2, 3]}"));
+    Mod pushMod(fromjson("{$push: {a: {$each: [], $slice: 0}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(0u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushOneWhereOnlyPrefixOfPathExists) {
+    Document doc(fromjson("{a: {}}"));
+    Mod pushMod(fromjson("{$push: {'a.b': 1}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(1u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushEachWhereOnlyPrefixOfPathExists) {
+    Document doc(fromjson("{a: {}}"));
+    Mod pushMod(fromjson("{$push: {'a.b': {$each: [1, 2, 3]}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(3u, pushMod.mod().arraySizeAfterApply());
+}
+
+TEST(ArraySizeAfterApplyTest, PushEachWhereOnlyPrefixOfPathExistsWithSlice) {
+    Document doc(fromjson("{a: {}}"));
+    Mod pushMod(fromjson("{$push: {'a.b': {$each: [1, 2, 3], $slice: 1}}}"));
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+    ASSERT_EQ(2u, pushMod.mod().arraySizeAfterApply());
 }
 
 /**

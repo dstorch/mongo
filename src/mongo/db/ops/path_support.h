@@ -42,9 +42,11 @@ namespace mongo {
 
 namespace pathsupport {
 
-// Cap on the number of nulls we'll add to an array if we're inserting to an index that
-// doesn't exist.
-static const size_t kMaxPaddingAllowed = 1500000;
+// We prevent updates from creating arrays that have more than this many elements. Why 1.5M + 1
+// instead of 1.5M? Because we have historically allowed backfilling an array on $set with at most
+// 1.5M null elements, leading to an array that has 1.5M nulls plus the additional element created
+// by $set.
+static const size_t kMaxArrayElems = 1500001;
 
 // Convenience type to hold equality matches at particular paths from a MatchExpression
 typedef std::map<StringData, const EqualityMatchExpression*> EqualityMatches;

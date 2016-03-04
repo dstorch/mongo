@@ -444,6 +444,19 @@ Status ModifierPush::prepare(mutablebson::Element root,
         return status;
     }
 
+    // This is the count of the array before we change it, or 0 if missing from the doc.
+    _preparedState->arrayPreModSize = 0;
+    if (_preparedState->elemFound.ok() && _preparedState->idxFound == (_fieldRef.numParts() - 1)) {
+        _preparedState->arrayPreModSize = countChildren(_preparedState->elemFound);
+    }
+
+    // Fail if we're going to create a too-long array.
+    if (arraySizeAfterApply() > pathsupport::kMaxArrayElems) {
+        return Status(ErrorCodes::CannotBackfillArray,
+                      str::stream() << "Cannot use $push to create an array with more than "
+                                    << pathsupport::kMaxArrayElems << " elements.");
+    }
+
     // We register interest in the field name. The driver needs this info to sort out if
     // there is any conflict among mods.
     execInfo->fieldRef[0] = &_fieldRef;
@@ -528,9 +541,6 @@ Status ModifierPush::apply() const {
         // already.
         _preparedState->elemFound = baseArray;
     }
-
-    // This is the count of the array before we change it, or 0 if missing from the doc.
-    _preparedState->arrayPreModSize = countChildren(_preparedState->elemFound);
 
     // 2. Add new elements to the array either by going over the $each array or by
     // appending the (old style $push) element.
@@ -656,6 +666,30 @@ Status ModifierPush::log(LogBuilder* logBuilder) const {
 
             return logBuilder->addToSetsWithNewFieldName(positionalName, _val);
         }
+    }
+}
+
+size_t ModifierPush::arraySizeAfterApply() const {
+    if (_eachMode || _pushMode == PUSH_ALL) {
+        if (_slicePresent && _slice == 0) {
+            // A slice value of zero means we clear the whole array.
+            return 0;
+        }
+
+        // We're pushing a list of values.
+        size_t numberPushing = _eachElem.embeddedObject().nFields();
+        size_t sizeAfterPush = _preparedState->arrayPreModSize + numberPushing;
+
+        size_t numberSlicing = _slicePresent ? abs(_slice) : 0;
+        if (numberSlicing > sizeAfterPush) {
+            // We're slicing off everything.
+            return 0;
+        }
+
+        return sizeAfterPush - numberSlicing;
+    } else {
+        // We're pushing a single value.
+        return _preparedState->arrayPreModSize + 1;
     }
 }
 

@@ -95,6 +95,13 @@ public:
      */
     virtual Status log(LogBuilder* logBuilder) const;
 
+    /**
+     * Compute what the size of the array will be after applying the mod.
+     *
+     * Only valid to call after both init() and prepare().
+     */
+    size_t arraySizeAfterApply() const;
+
 private:
     // Access to each component of fieldName that's the target of this mod.
     FieldRef _fieldRef;

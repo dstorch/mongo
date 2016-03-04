@@ -456,8 +456,7 @@ TEST_F(ArrayDoc, ArrayPaddingNecessary) {
 
 TEST_F(ArrayDoc, ExcessivePaddingRequested) {
     // Try to create an array item beyond what we're allowed to pad.
-    string paddedField = stream() << "b." << mongo::pathsupport::kMaxPaddingAllowed + 1;
-    ;
+    string paddedField = stream() << "b." << mongo::pathsupport::kMaxArrayElems;
     setField(paddedField);
 
     size_t idxFound;

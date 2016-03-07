@@ -65,19 +65,12 @@ public:
     class ComparisonKey {
     public:
         /**
-         * Returns a number < 0 if this is lexicographically less than 'other', a number > 0 if this
-         * is lexicographically greater than 'other' and 0 if this and 'other' are equal.
-         */
-        int compare(const ComparisonKey& other) const {
-            StringData thisData(_key);
-            StringData otherData(other._key);
-            return thisData.compare(otherData);
-        }
-
-        /**
          * Returns the underlying byte array represented by this ComparisonKey.
+         *
+         * The returned StringData may not outlive the ComparisonKey used to create it, since the
+         * ComparisonKey owns the underlying byte array.
          */
-        const StringData getKeyData() const {
+        StringData getKeyData() const {
             return StringData(_key);
         }
 

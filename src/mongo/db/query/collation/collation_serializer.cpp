@@ -30,8 +30,10 @@
 
 #include "mongo/db/query/collation/collation_serializer.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/collation/collation_spec.h"
 
 namespace mongo {
 
@@ -47,7 +49,9 @@ void CollationSerializer::appendCollationKey(StringData fieldName,
                                              const CollatorInterface::ComparisonKey& key,
                                              BSONObjBuilder* bob) {
     const auto keyData = key.getKeyData();
-    bob->append(fieldName, keyData.rawData(), keyData.size());
+    // 'keyData' should not contain a trailing null byte, but the BSONObjBuilder will add one after
+    // appending the string.
+    bob->append(fieldName, keyData);
 }
 
 }  // namespace mongo

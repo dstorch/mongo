@@ -43,20 +43,22 @@ CollatorInterfaceICU::CollatorInterfaceICU(CollationSpec spec,
 int CollatorInterfaceICU::compare(StringData left, StringData right) {
     // TODO: What happens if 'status' is a failure code? In what circumstances could this happen?
     UErrorCode status = U_ZERO_ERROR;
-    auto compareResult = _collator->compare(icu::UnicodeString(left.rawData(), left.size()),
-                                            icu::UnicodeString(right.rawData(), right.size()),
-                                            status);
+    auto compareResult = _collator->compareUTF8(icu::StringPiece(left.rawData(), left.size()),
+                                                icu::StringPiece(right.rawData(), right.size()),
+                                                status);
     invariant(U_SUCCESS(status));
 
     return compareResult;
 }
 
 CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(StringData stringData) {
+    // A StringPiece is ICU's StringData. They are logically the same abstraction.
+    const icu::StringPiece stringPiece(stringData.rawData(), stringData.size());
+
     // TODO: What happens if 'status' is a failure code? In what circumstances could this happen?
     UErrorCode status = U_ZERO_ERROR;
     icu::CollationKey icuKey;
-    _collator->getCollationKey(
-        icu::UnicodeString(stringData.rawData(), stringData.size()), icuKey, status);
+    _collator->getCollationKey(icu::UnicodeString::fromUTF8(stringPiece), icuKey, status);
     invariant(U_SUCCESS(status));
 
     int32_t keyLength;
@@ -64,8 +66,11 @@ CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(StringDa
     invariant(keyLength > 0);
     invariant(keyBuffer);
 
-    const char* charBuffer = static_cast<const char*>(static_cast<const void*>(keyBuffer));
-    return makeComparisonKey(std::string(charBuffer, keyLength));
+    // The last byte the sort key should always be null. When we construct the comparison key, we
+    // omit the trailing null byte.
+    invariant(keyBuffer[keyLength - 1u] == '\0');
+    const char* charBuffer = reinterpret_cast<const char*>(keyBuffer);
+    return makeComparisonKey(std::string(charBuffer, keyLength - 1u));
 }
 
 }  // namespace mongo

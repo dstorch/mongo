@@ -28,14 +28,15 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
 
 class BSONObj;
 class BSONObjBuilder;
+class StringData;
+
+struct CollationSpec;
 
 /**
  * Provides functions for serializing collation-related objects.
@@ -45,6 +46,8 @@ public:
     /**
      * Converts CollationSpec 'spec' to its BSONObj representation. The resulting BSON can be stored
      * and later used to recreate the corresponding CollatorInterface.
+     *
+     * The resulting BSONObj is owned by the caller.
      */
     static BSONObj specToBSON(const CollationSpec& spec);
 

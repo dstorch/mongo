@@ -90,15 +90,15 @@ TEST(CollatorInterfaceICUTest, FactoryMadeCollatorComparisonKeysCorrectEnUS) {
     const auto comparisonKeyABB = collator.getValue()->getComparisonKey("abb");
     const auto comparisonKeyBA = collator.getValue()->getComparisonKey("ba");
 
-    ASSERT_LT(comparisonKeyAB.compare(comparisonKeyBA), 0);
-    ASSERT_GT(comparisonKeyBA.compare(comparisonKeyAB), 0);
-    ASSERT_EQ(comparisonKeyAB.compare(comparisonKeyAB), 0);
+    ASSERT_LT(comparisonKeyAB.getKeyData().compare(comparisonKeyBA.getKeyData()), 0);
+    ASSERT_GT(comparisonKeyBA.getKeyData().compare(comparisonKeyAB.getKeyData()), 0);
+    ASSERT_EQ(comparisonKeyAB.getKeyData().compare(comparisonKeyAB.getKeyData()), 0);
 
-    ASSERT_LT(comparisonKeyAB.compare(comparisonKeyABB), 0);
-    ASSERT_GT(comparisonKeyABB.compare(comparisonKeyAB), 0);
+    ASSERT_LT(comparisonKeyAB.getKeyData().compare(comparisonKeyABB.getKeyData()), 0);
+    ASSERT_GT(comparisonKeyABB.getKeyData().compare(comparisonKeyAB.getKeyData()), 0);
 
-    ASSERT_GT(comparisonKeyBA.compare(comparisonKeyABB), 0);
-    ASSERT_LT(comparisonKeyABB.compare(comparisonKeyBA), 0);
+    ASSERT_GT(comparisonKeyBA.getKeyData().compare(comparisonKeyABB.getKeyData()), 0);
+    ASSERT_LT(comparisonKeyABB.getKeyData().compare(comparisonKeyBA.getKeyData()), 0);
 }
 
 }  // namespace

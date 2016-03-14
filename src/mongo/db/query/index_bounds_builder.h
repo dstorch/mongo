@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+class CollatorInterface;
+
 /**
  * Translates expressions over fields into bounds on an index.
  */
@@ -125,10 +127,11 @@ public:
     static Interval makePointInterval(double d);
 
     /**
-     * Since we have no BSONValue we must make an object that's a copy of a piece of another
-     * object.
+     * Wraps 'elt' in a BSONObj with an empty field name and returns the result. If 'elt' is a
+     * string, and 'collator' is non-null, the result contains the collator-generated comparison key
+     * rather than the original string.
      */
-    static BSONObj objFromElement(const BSONElement& elt);
+    static BSONObj objFromElement(const BSONElement& elt, CollatorInterface* collator);
 
     /**
      * Swap start/end in the provided interval.
@@ -136,16 +139,18 @@ public:
     static void reverseInterval(Interval* ival);
 
     /**
-     * Copied almost verbatim from db/queryutil.cpp.
+     * Returns a std::string that when used as a matcher, would match a super set of regex().  Used
+     * to optimize queries in some simple regex cases that start with '^'.
      *
-     *  returns a std::string that when used as a matcher, would match a super set of regex()
+     * Returns "" for complex regular expressions that cannot use tight index bounds.
      *
-     *  returns "" for complex regular expressions
-     *
-     *  used to optimize queries in some simple regex cases that start with '^'
+     * A regex can never use tight bounds if the index has a non-null collator. In this case, the
+     * regex must also be applied to the fetched document rather than the index key, so the
+     * tightness is INEXACT_FETCH.
      */
     static std::string simpleRegex(const char* regex,
                                    const char* flags,
+                                   const IndexEntry& index,
                                    BoundsTightness* tightnessOut);
 
     /**
@@ -154,10 +159,12 @@ public:
     static Interval allValues();
 
     static void translateRegex(const RegexMatchExpression* rme,
+                               const IndexEntry& index,
                                OrderedIntervalList* oil,
                                BoundsTightness* tightnessOut);
 
     static void translateEquality(const BSONElement& data,
+                                  const IndexEntry& index,
                                   bool isHashed,
                                   OrderedIntervalList* oil,
                                   BoundsTightness* tightnessOut);

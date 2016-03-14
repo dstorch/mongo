@@ -86,13 +86,23 @@ BSONObj CollationSerializer::specToBSON(const CollationSpec& spec) {
     return builder.obj();
 }
 
-void CollationSerializer::appendCollationKey(StringData fieldName,
-                                             const CollatorInterface::ComparisonKey& key,
-                                             BSONObjBuilder* bob) {
-    const auto keyData = key.getKeyData();
-    // 'keyData' should not contain a trailing null byte, but the BSONObjBuilder will add one after
-    // appending the string.
-    bob->append(fieldName, keyData);
+// TODO SERVER-23172: Update this to consider strings inside nested objects or arrays.
+bool CollationSerializer::shouldUseCollationKey(const BSONElement& elt,
+                                                CollatorInterface* collator) {
+    return collator && elt.type() == BSONType::String;
+}
+
+// TODO SERVER-23172: Update this to convert strings inside nested objects or arrays to their
+// corresponding comparison keys.
+void CollationSerializer::collationAwareAppend(const BSONElement& elt,
+                                               CollatorInterface* collator,
+                                               BSONObjBuilder* out) {
+    if (shouldUseCollationKey(elt, collator)) {
+        auto comparisonKey = collator->getComparisonKey(elt.valueStringData());
+        out->append("", comparisonKey.getKeyData());
+    } else {
+        out->appendAs(elt, "");
+    }
 }
 
 }  // namespace mongo

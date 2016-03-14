@@ -199,39 +199,35 @@ TEST(CollationSerializerTest, ToBSONCorrectlySerializesMaxVariableSpace) {
     ASSERT_EQ(expectedObj, CollationSerializer::specToBSON(collationSpec));
 }
 
-TEST(CollationSerializerTest, CorrectlySerializeASCIIComparisonKey) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    auto comparisonKey = collator.getComparisonKey("abc");
-
-    BSONObjBuilder builder;
-    CollationSerializer::appendCollationKey("foo", comparisonKey, &builder);
-    ASSERT_EQ(builder.obj(),
-              BSON("foo"
-                   << "cba"));
+TEST(CollationSerializerTest, ShouldUseCollationKeyFalseWithNullCollator) {
+    BSONObj obj = BSON("foo"
+                       << "string");
+    ASSERT_FALSE(CollationSerializer::shouldUseCollationKey(obj.firstElement(), nullptr));
 }
 
-TEST(CollationSerializerTest, CorrectlySerializeEmptyComparisonKey) {
+TEST(CollationSerializerTest, ShouldUseCollationKeyFalseWithNonStringElement) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    auto comparisonKey = collator.getComparisonKey(StringData());
-
-    BSONObjBuilder builder;
-    CollationSerializer::appendCollationKey("foo", comparisonKey, &builder);
-    ASSERT_EQ(builder.obj(),
-              BSON("foo"
-                   << ""));
+    BSONObj obj = BSON("foo" << BSON("bar"
+                                     << "string"));
+    ASSERT_FALSE(CollationSerializer::shouldUseCollationKey(obj.firstElement(), &collator));
 }
 
-TEST(CollationSerializerTest, CorrectlySerializeComparisonKeyWithEmbeddedNullByte) {
+TEST(CollationSerializerTest, ShouldUseCollationKeyTrueWithStringElement) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    auto comparisonKey = collator.getComparisonKey(StringData("a\0b", StringData::LiteralTag()));
+    BSONObj obj = BSON("foo"
+                       << "string");
+    ASSERT_TRUE(CollationSerializer::shouldUseCollationKey(obj.firstElement(), &collator));
+}
 
-    BSONObjBuilder builder;
-    CollationSerializer::appendCollationKey("foo", comparisonKey, &builder);
-    BSONObj resultingObj = builder.obj();
-
-    BSONObjBuilder expectedBuilder;
-    expectedBuilder.append("foo", StringData("b\0a", StringData::LiteralTag()));
-    ASSERT_EQ(resultingObj, expectedBuilder.obj());
+TEST(CollationSerializerTest, CollationAwareAppendReversesStringWithReverseMockCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    BSONObj dataObj = BSON("foo"
+                           << "string");
+    BSONObjBuilder out;
+    CollationSerializer::collationAwareAppend(dataObj.firstElement(), &collator, &out);
+    ASSERT_EQ(out.obj(),
+              BSON(""
+                   << "gnirts"));
 }
 
 }  // namespace

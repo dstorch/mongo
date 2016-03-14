@@ -134,7 +134,7 @@ struct IndexEntry {
 
     // Null if this index orders strings according to the simple binary compare. If non-null,
     // represents the collator used to generate index keys for indexed strings.
-    const CollatorInterface* collator = nullptr;
+    CollatorInterface* collator = nullptr;
 };
 
 }  // namespace mongo

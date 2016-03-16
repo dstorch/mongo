@@ -139,14 +139,10 @@ public:
     static void reverseInterval(Interval* ival);
 
     /**
-     * Returns a std::string that when used as a matcher, would match a super set of regex().  Used
-     * to optimize queries in some simple regex cases that start with '^'.
+     * Returns a std::string that when used as a matcher, would match a superset of regex. Used to
+     * optimize queries in some simple regex cases that start with '^'.
      *
      * Returns "" for complex regular expressions that cannot use tight index bounds.
-     *
-     * A regex can never use tight bounds if the index has a non-null collator. In this case, the
-     * regex must also be applied to the fetched document rather than the index key, so the
-     * tightness is INEXACT_FETCH.
      */
     static std::string simpleRegex(const char* regex,
                                    const char* flags,

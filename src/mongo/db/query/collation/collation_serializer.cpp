@@ -87,14 +87,14 @@ BSONObj CollationSerializer::specToBSON(const CollationSpec& spec) {
 }
 
 // TODO SERVER-23172: Update this to consider strings inside nested objects or arrays.
-bool CollationSerializer::shouldUseCollationKey(const BSONElement& elt,
+bool CollationSerializer::shouldUseCollationKey(BSONElement elt,
                                                 CollatorInterface* collator) {
     return collator && elt.type() == BSONType::String;
 }
 
 // TODO SERVER-23172: Update this to convert strings inside nested objects or arrays to their
 // corresponding comparison keys.
-void CollationSerializer::collationAwareAppend(const BSONElement& elt,
+void CollationSerializer::collationAwareAppend(BSONElement elt,
                                                CollatorInterface* collator,
                                                BSONObjBuilder* out) {
     if (shouldUseCollationKey(elt, collator)) {

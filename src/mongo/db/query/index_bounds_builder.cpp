@@ -57,12 +57,6 @@ namespace {
 // Tightness rules are shared for $lt, $lte, $gt, $gte.
 IndexBoundsBuilder::BoundsTightness getInequalityPredicateTightness(const BSONElement& dataElt,
                                                                     const IndexEntry& index) {
-    // Only indices with the simple binary compare collation can be used to answer predicates
-    // comparing against a nested object or nested array.
-    if (dataElt.type() == BSONType::Array || dataElt.type() == BSONType::Object) {
-        invariant(!index.collator);
-    }
-
     // TODO SERVER-22786: Right now we consider a string comparison in the presence of a
     // collator to be inexact fetch, since such queries cannot be covered. Although it is
     // necessary to fetch the keyed documents, it is not necessary to reapply the filter.
@@ -84,6 +78,11 @@ string IndexBoundsBuilder::simpleRegex(const char* regex,
                                        const IndexEntry& index,
                                        BoundsTightness* tightnessOut) {
     if (index.collator) {
+        // Bounds building for simple regular expressions assumes that the index is in ASCII order,
+        // which is not necessarily true for an index with a collator.  Therefore, a regex can never
+        // use tight bounds if the index has a non-null collator. In this case, the regex must be
+        // applied to the fetched document rather than the index key, so the tightness is
+        // INEXACT_FETCH.
         *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         return "";
     }
@@ -327,15 +326,24 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         translate(child, elt, index, oilOut, tightnessOut);
         oilOut->complement();
 
-        // If the index is multikey, it doesn't matter what the tightness
-        // of the child is, we must return INEXACT_FETCH. Consider a multikey
-        // index on 'a' with document {a: [1, 2, 3]} and query {a: {$ne: 3}}.
-        // If we treated the bounds [MinKey, 3), (3, MaxKey] as exact, then
-        // we would erroneously return the document!
-        if (index.multikey) {
+        // If the index is multikey, it doesn't matter what the tightness of the child is, we must
+        // return INEXACT_FETCH. Consider a multikey index on 'a' with document {a: [1, 2, 3]} and
+        // query {a: {$ne: 3}}.  If we treated the bounds [MinKey, 3), (3, MaxKey] as exact, then we
+        // would erroneously return the document!
+        //
+        // If the index has a collator, then complementing the bounds generally results in strings
+        // being in-bounds. Such index bounds cannot be used in a covered plan, since we should
+        // never return collator comparison keys to the user. As such, we must make the bounds
+        // INEXACT_FETCH in this case.
+        //
+        // TODO SERVER-22786: Although it is necessary to fetch the keyed documents, it is not
+        // necessary to reapply the filter.
+        if (index.multikey || index.collator) {
             *tightnessOut = INEXACT_FETCH;
         }
     } else if (MatchExpression::EXISTS == expr->matchType()) {
+        oilOut->intervals.push_back(allValues());
+
         // We only handle the {$exists:true} case, as {$exists:false}
         // will have been translated to {$not:{ $exists:true }}.
         //
@@ -354,8 +362,13 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         // {a:{ $exists:false }} - sparse indexes cannot be used at all.
         //
         // Noted in SERVER-12869, in case this ever changes some day.
-        if (index.sparse) {
-            oilOut->intervals.push_back(allValues());
+        //
+        // Bounds are always INEXACT_FETCH if there is a collator on the index, since the bounds
+        // include collator-generated sort keys that shouldn't be returned to the user.
+        //
+        // TODO SERVER-22786: Although it is necessary to fetch the keyed documents when there is a
+        // collator, it is not necessary to reapply the filter.
+        if (index.sparse && !index.collator) {
             // A sparse, compound index on { a:1, b:1 } will include entries
             // for all of the following documents:
             //    { a:1 }, { b:1 }, { a:1, b:1 }
@@ -366,7 +379,6 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
                 *tightnessOut = IndexBoundsBuilder::EXACT;
             }
         } else {
-            oilOut->intervals.push_back(allValues());
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
     } else if (MatchExpression::EQ == expr->matchType()) {
@@ -804,12 +816,6 @@ void IndexBoundsBuilder::translateEquality(const BSONElement& data,
                                            bool isHashed,
                                            OrderedIntervalList* oil,
                                            BoundsTightness* tightnessOut) {
-    // Only indices with the simple binary compare collation can be used to answer predicates
-    // comparing against a nested object or nested array.
-    if (data.type() == BSONType::Array || data.type() == BSONType::Object) {
-        invariant(!index.collator);
-    }
-
     // We have to copy the data out of the parse tree and stuff it into the index
     // bounds.  BSONValue will be useful here.
     if (Array != data.type()) {

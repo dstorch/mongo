@@ -230,4 +230,34 @@ TEST(CollationSerializerTest, CollationAwareAppendReversesStringWithReverseMockC
                    << "gnirts"));
 }
 
+TEST(CollationSerializerTest, CollationAwareAppendCorrectlySerializesEmptyComparisonKey) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    BSONObjBuilder builder;
+    builder.append("foo", StringData());
+    BSONObj dataObj = builder.obj();
+
+    BSONObjBuilder expectedBuilder;
+    expectedBuilder.append("", StringData());
+    BSONObj expectedObj = expectedBuilder.obj();
+
+    BSONObjBuilder out;
+    CollationSerializer::collationAwareAppend(dataObj.firstElement(), &collator, &out);
+    ASSERT_EQ(out.obj(), expectedObj);
+}
+
+TEST(CollationSerializerTest, CollationAwareAppendCorrectlySerializesWithEmbeddedNullByte) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    BSONObjBuilder builder;
+    builder.append("foo", StringData("a\0b", StringData::LiteralTag()));
+    BSONObj dataObj = builder.obj();
+
+    BSONObjBuilder expectedBuilder;
+    expectedBuilder.append("", StringData("b\0a", StringData::LiteralTag()));
+    BSONObj expectedObj = expectedBuilder.obj();
+
+    BSONObjBuilder out;
+    CollationSerializer::collationAwareAppend(dataObj.firstElement(), &collator, &out);
+    ASSERT_EQ(out.obj(), expectedObj);
+}
+
 }  // namespace

@@ -1807,4 +1807,88 @@ TEST(IndexBoundsBuilderTest, SimplePrefixRegexWithMockCollator) {
     ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
 }
 
+TEST(IndexBoundsBuilderTest, NotWithMockCollatorIsInexactFetch) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    testIndex.collator = &collator;
+
+    BSONObj obj = fromjson("{a: {$ne:  3}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.intervals.size(), 2U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(minKeyIntObj(3), true, false)));
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[1].compare(Interval(maxKeyIntObj(3), false, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+}
+
+TEST(IndexBoundsBuilderTest, ExistsTrueWithMockCollatorAndSparseIsInexactFetch) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    testIndex.collator = &collator;
+    testIndex.sparse = true;
+
+    BSONObj obj = fromjson("{a: {$exists: true}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(IndexBoundsBuilder::allValues()));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+}
+
+TEST(IndexBoundsBuilderTest, ExistsFalseWithMockCollatorIsInexactFetch) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    testIndex.collator = &collator;
+
+    BSONObj obj = fromjson("{a: {$exists: false}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': null, '': null}"), true, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+}
+
+TEST(IndexBoundsBuilderTest, TypeStringIsInexactFetch) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    testIndex.collator = &collator;
+
+    BSONObj obj = fromjson("{a: {$type: 'string'}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': '', '': {}}"), true, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+}
+
 }  // namespace

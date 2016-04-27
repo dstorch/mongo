@@ -216,13 +216,13 @@ TEST(ProjectionExecTest, TransformElemMatch) {
 
 TEST(ProjectionExecTest, ElemMatchProjectionRespectsCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    testTransform("{a: {$elemMatch: {$eq: 'gnirts'}}}",
+    testTransform("{a: {$elemMatch: {$gte: 'abc'}}}",
                   "{}",
-                  "{a: ['string', 'foo', 'gnirts', 'bar']}",
+                  "{a: ['zaa', 'zbb', 'zdd', 'zee']}",
                   nullptr,  // WSM computed data
                   &collator,
                   true,
-                  "{a: ['gnirts']}");
+                  "{a: ['zdd']}");
 }
 
 //

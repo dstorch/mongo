@@ -30,6 +30,8 @@
 
 #include "mongo/db/query/collation/collator_factory_icu.h"
 
+#include <algorithm>
+#include <boost/algorithm/string.hpp>
 #include <unicode/errorcode.h>
 
 #include "mongo/bson/bsonobj.h"
@@ -546,6 +548,134 @@ StatusWith<std::string> parseLocaleID(const BSONObj& spec) {
     return localeID;
 }
 
+// Returns a non-OK status if any part of the locale ID is invalid or not recognized by ICU.
+Status validateLocaleID(const BSONObj& spec,
+                        const std::string& originalID,
+                        const icu::Collator& collator) {
+    // Check that the locale ID is recognized by ICU. Constructing an icu::Collator from an
+    // unrecognized locale will cause the collator to fall back on the default locale.
+    UErrorCode status = U_ZERO_ERROR;
+    icu::Locale collatorLocale = collator.getLocale(ULOC_VALID_LOCALE, status);
+    if (U_FAILURE(status)) {
+        icu::ErrorCode icuError;
+        icuError.set(status);
+        return {ErrorCodes::OperationFailed,
+                str::stream() << "Failed to get locale from icu::Collator: " << icuError.errorName()
+                              << ". Collation spec: " << spec};
+    }
+
+    // Here we do some custom validation of the locale id. Locale ids have the following format:
+    //
+    //   language_script_country_variant@keyword1=value1;keyword2=value2
+    //
+    // The language is required but other parts are optional. If any component of the locale id is
+    // unrecognized, the ICU will fall back to the default. In the mongo layer, we would like to
+    // error in the case of bad locale ids, so we detect cases in which the user specified, for
+    // example, a country code, but the icu::Locale is missing the country code.
+    //
+    // We can determine which components are present in the locale id (other than keywords) by
+    // counting the underscore characters:
+    //  - If there are no underscores, then the format is "language".
+    //  - If there is one underscore, then the format is "language_country". The country code is
+    //  always two characters.
+    //  - If there are two underscores, then the format is "language_country_variant".
+    //  - If there are three underscores, then the format is "language_script_country_variant". The
+    //  script code is always four characters.
+
+    // Separate the keywords from the locale id proper.
+    std::string trimmedLocale = originalID.substr(0, originalID.find("@"));
+    std::string localeKeywords;
+    if (trimmedLocale.size() < originalID.size()) {
+        localeKeywords = originalID.substr(originalID.find("@") + 1);
+    }
+
+    const size_t numComponents = std::count(trimmedLocale.begin(), trimmedLocale.end(), '_') + 1;
+    if (numComponents > 4) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Field '" << CollationSpec::kLocaleField
+                              << "' has too many '_' characters. Collation spec: " << spec};
+    }
+
+    if (trimmedLocale.front() == '_') {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Field '" << CollationSpec::kLocaleField
+                              << "' cannot begin with the '_' character. Collation spec: " << spec};
+    }
+
+    if (trimmedLocale.back() == '_') {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Field '" << CollationSpec::kLocaleField
+                              << "' cannot end with the '_' character. Collation spec: " << spec};
+    }
+
+    const char* collatorLocaleBaseName = collatorLocale.getBaseName();
+    if (str::equals("", collatorLocaleBaseName) ||
+        str::equals(kFallbackLocaleName, collatorLocaleBaseName)) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Field '" << CollationSpec::kLocaleField
+                              << "' has an unrecognized locale base name in: " << spec};
+    }
+
+    std::vector<std::string> localeComponents;
+    boost::split(localeComponents, trimmedLocale, boost::is_any_of("_"));
+    invariant(!localeComponents.empty());
+    invariant(localeComponents.size() <= 4);
+
+    // We already verified that we have a valid base locale, so there should be a non-empty string
+    // as the first locale component.
+    invariant(!localeComponents[0].empty());
+
+    // The second component can either be a two-letter country code or a four-letter script code.
+    if (localeComponents.size() >= 2 && !localeComponents[1].empty()) {
+        if (localeComponents[1].size() != 2 && localeComponents[1].size() != 4) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Field '" << CollationSpec::kLocaleField
+                                  << "' has a malformed locale in: " << spec};
+        }
+
+        if (localeComponents[1].size() == 2 && str::equals("", collatorLocale.getCountry())) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Field '" << CollationSpec::kLocaleField
+                                  << "' has an unrecognized country code in: " << spec};
+        }
+
+        if (localeComponents[1].size() == 4 && str::equals("", collatorLocale.getScript())) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Field '" << CollationSpec::kLocaleField
+                                  << "' has an unrecognized script code in: " << spec};
+        }
+    }
+
+    // If the second component is a country code or is empty, then the third component must be the
+    // variant code.  Alternatively, if the second component is a script code, then the third
+    // component must be the country code.
+    if (localeComponents.size() >= 3 && !localeComponents[2].empty()) {
+        if ((localeComponents[1].size() == 2 || localeComponents[1].empty()) &&
+            str::equals("", collatorLocale.getVariant())) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Field '" << CollationSpec::kLocaleField
+                                  << "' has an unrecognized variant code in: " << spec};
+        }
+
+        if (!localeComponents[1].empty() && str::equals("", collatorLocale.getCountry())) {
+            invariant(localeComponents[1].size() == 4);
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Field '" << CollationSpec::kLocaleField
+                                  << "' has an unrecognized country code in: " << spec};
+        }
+    }
+
+    // The fourth component is always the variant.
+    if (localeComponents.size() == 4 && !localeComponents[3].empty() &&
+        str::equals("", collatorLocale.getVariant())) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Field '" << CollationSpec::kLocaleField
+                              << "' has an unrecognized variant code in: " << spec};
+    }
+
+    return Status::OK();
+}
+
 }  // namespace
 
 StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
@@ -587,22 +717,9 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
                               << ". Collation spec: " << spec};
     }
 
-    // Check that the locale ID is recognized by ICU. Constructing an icu::Collator from an
-    // unrecognized locale will cause the collator to fall back on the default locale.
-    icu::Locale collatorLocale = icuCollator->getLocale(ULOC_VALID_LOCALE, status);
-    if (U_FAILURE(status)) {
-        icu::ErrorCode icuError;
-        icuError.set(status);
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "Failed to get locale from icu::Collator: " << icuError.errorName()
-                              << ". Collation spec: " << spec};
-    }
-    const char* collatorLocaleBaseName = collatorLocale.getBaseName();
-    if (str::equals("", collatorLocaleBaseName) ||
-        str::equals(kFallbackLocaleName, collatorLocaleBaseName)) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Field '" << CollationSpec::kLocaleField
-                              << "' is not a recognized ICU locale in: " << spec};
+    Status localeValidationStatus = validateLocaleID(spec, parsedLocaleID.getValue(), *icuCollator);
+    if (!localeValidationStatus.isOK()) {
+        return localeValidationStatus;
     }
 
     // Construct a CollationSpec using the options provided in spec or the defaults in icuCollator.

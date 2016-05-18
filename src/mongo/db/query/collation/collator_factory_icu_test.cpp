@@ -127,6 +127,38 @@ TEST(CollatorFactoryICUTest, LocaleRootCanonicalizedDisallowed) {
     ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
 }
 
+TEST(CollatorFactoryICUTest, LocaleWithTrailingUnderscoreDisallowed) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_"));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+}
+
+TEST(CollatorFactoryICUTest, LocaleWithLeadingUnderscoreDisallowed) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "_en"));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+}
+
+TEST(CollatorFactoryICUTest, LocaleWithExtraComponentDisallowed) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en___US_POSIX"));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+}
+
+TEST(CollatorFactoryICUTest, LocaleWithUnrecognizedTwoLetterCountryCodeDisallowed) {
+    CollatorFactoryICU factory;
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "xx_US"));
+    ASSERT_NOT_OK(collator.getStatus());
+    ASSERT_EQ(collator.getStatus(), ErrorCodes::BadValue);
+}
+
 TEST(CollatorFactoryICUTest, LocaleStringCannotContainNullByte) {
     CollatorFactoryICU factory;
     auto collator =
@@ -702,7 +734,7 @@ TEST(CollatorFactoryICUTest, SecondaryStrengthBackwardsTrue) {
     ASSERT_GT(collator.getValue()->compare(u8"a\u00E1", u8"\u00E1a"), 0);
 }
 
-TEST(CollatorInterfaceICUTest, FactoryMadeCollatorComparisonKeysCorrectEnUS) {
+TEST(CollatorFactoryICUTest, FactoryMadeCollatorComparisonKeysCorrectEnUS) {
     CollatorFactoryICU factory;
     auto collator = factory.makeFromBSON(BSON("locale"
                                               << "en_US"));

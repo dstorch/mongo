@@ -160,5 +160,32 @@
     assert.eq(cmdRes.cursor.firstBatch[4], {key: {"": 5}});
     assert.eq(cmdRes.cursor.firstBatch[5], {key: {"": 9}});
 
+    // If there is a collation, sortKey meta-projection should give us back a collator-generated
+    // comparison key. Without the collation it's the verbatim string.
+    cmdRes = db.runCommand({
+        find: coll.getName(),
+        filter: {b: "foo"},
+        projection: {_id: 0, a: 0, b: 0, key: {$meta: 'sortKey'}},
+        sort: {b: 1}
+    });
+    assert.commandWorked(cmdRes);
+    assert.eq(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
+    assert.eq(cmdRes.cursor.firstBatch.length, 1);
+    assert.eq(cmdRes.cursor.firstBatch[0], {key: {"": "foo"}});
+
+    cmdRes = db.runCommand({
+        find: coll.getName(),
+        filter: {b: "foo"},
+        projection: {_id: 0, a: 0, b: 0, key: {$meta: 'sortKey'}},
+        sort: {b: 1},
+        collation: {locale: "en_US", strength: 2}
+    });
+    assert.commandWorked(cmdRes);
+    assert.eq(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
+    assert.eq(cmdRes.cursor.firstBatch.length, 1);
+    assert.neq(cmdRes.cursor.firstBatch[0], {key: {"": "foo"}});
+
     st.stop();
 })();

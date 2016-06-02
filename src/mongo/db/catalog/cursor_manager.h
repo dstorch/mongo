@@ -30,12 +30,17 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <map>
+#include <unordered_set>
+#include <vector>
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/invalidation_type.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -84,13 +89,17 @@ public:
      * Register an executor so that it can be notified of deletion/invalidation during yields.
      * Must be called before an executor yields.  If an executor is cached (inside a
      * ClientCursor) it MUST NOT be registered; the two are mutually exclusive.
+     *
+     * Returns a token which the caller must pass back to us in order to deregister the cursor. See
+     * deregisterExecutor().
      */
-    void registerExecutor(PlanExecutor* exec);
+    size_t registerExecutor(PlanExecutor* exec);
 
     /**
-     * Remove an executor from the registry.
+     * Remove an executor from the registry. The value of 'registrationToken' must be the value
+     * given to the caller when 'exec' was registered with registerExecutor().
      */
-    void deregisterExecutor(PlanExecutor* exec);
+    void deregisterExecutor(PlanExecutor* exec, size_t registrationToken);
 
     // -----------------
 
@@ -143,19 +152,93 @@ public:
     static std::size_t timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall);
 
 private:
+    struct ExecutorSet {
+        // Synchronizes access to 'executors'. Rather than locking this mutex directly, use the
+        // ExecutorRegistryPartitionGuard.
+        stdx::mutex mutex;
+
+        // Prefer to access via ExecutorRegistryPartitionGuard::operator->().
+        std::unordered_set<PlanExecutor*> executors;
+    };
+
+    // A partitioned data structure with which PlanExecutors are registered in order to receive
+    // notifications of events such as collection drops or invalidations. If the PlanExecutor is
+    // owned by a ClientCursor, it is instead registered in '_cursors'.
+    //
+    // In order to avoid a performance bottleneck, the executors are divided into n partitions, and
+    // access to each partition is synchronized separately. Locking of partitions should be done via
+    // the ExecutorRegistryPartitionGuard.
+    struct PartitionedExecutorRegistry {
+        static const size_t kNumPartitions = 8;
+
+        PartitionedExecutorRegistry() : partitions(kNumPartitions) {}
+
+        // Returns the index of the partition in the 'partitions' vector to which a new plan
+        // executor should be assigned.
+        size_t nextPartition() {
+            return _counter.fetchAndAdd(1) % kNumPartitions;
+        }
+
+        std::vector<ExecutorSet> partitions;
+
+    private:
+        AtomicUInt32 _counter;
+    };
+
+    // Used to protect access to either all partitions in the executor registry, or to protect
+    // access to a single partition.
+    //
+    // If also locking '_cursorMapMutex', the cursor map mutex must be acquired *after* acquiring
+    // this partition guard.
+    class ExecutorRegistryPartitionGuard {
+    public:
+        // Acquires locks for every partition.
+        ExecutorRegistryPartitionGuard(PartitionedExecutorRegistry* registry)
+            : _registry(registry) {
+            for (auto&& partition : registry->partitions) {
+                _lockGuards.emplace_back(stdx::unique_lock<stdx::mutex>(partition.mutex));
+            }
+        }
+
+        // Acquires locks for the ith partition.
+        ExecutorRegistryPartitionGuard(PartitionedExecutorRegistry* registry, size_t partition)
+            : _registry(registry), _partition(partition) {
+            _lockGuards.emplace_back(
+                stdx::unique_lock<stdx::mutex>(registry->partitions[partition].mutex));
+        }
+
+        // Returns a pointer to the set of plan executors which this guard is guarding. Only valid
+        // to use if there is a single locked partition.
+        std::unordered_set<PlanExecutor*>* operator->() {
+            invariant(_lockGuards.size() == 1);
+            invariant(_partition);
+            invariant(_partition < _registry->partitions.size());
+            return &_registry->partitions[*_partition].executors;
+        }
+
+    private:
+        PartitionedExecutorRegistry* _registry;
+
+        boost::optional<size_t> _partition;
+
+        std::vector<stdx::unique_lock<stdx::mutex>> _lockGuards;
+    };
+
     CursorId _allocateCursorId_inlock();
     void _deregisterCursor_inlock(ClientCursor* cc);
 
     NamespaceString _nss;
     unsigned _collectionCacheRuntimeId;
-    std::unique_ptr<PseudoRandom> _random;
 
-    mutable SimpleMutex _mutex;
+    PartitionedExecutorRegistry _planExecutorRegistry;
 
-    typedef unordered_set<PlanExecutor*> ExecSet;
-    ExecSet _nonCachedExecutors;
+    // Synchronizes access to '_cursors' and '_random'. If also locking the _planExecutorRegistry,
+    // the ExecutorRegistryPartitionGuard must be acquired *before* taking this lock.
+    mutable SimpleMutex _cursorMapMutex;
 
     typedef std::map<CursorId, ClientCursor*> CursorMap;
     CursorMap _cursors;
+
+    std::unique_ptr<PseudoRandom> _random;
 };
 }

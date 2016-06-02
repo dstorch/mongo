@@ -171,21 +171,22 @@ public:
         return collection->getCursorManager()->numCursors();
     }
 
-    void registerExec(PlanExecutor* exec) {
+    size_t registerExec(PlanExecutor* exec) {
         // TODO: This is not correct (create collection under S-lock)
         AutoGetCollectionForRead ctx(&_txn, nss.ns());
         WriteUnitOfWork wunit(&_txn);
         Collection* collection = ctx.getDb()->getOrCreateCollection(&_txn, nss.ns());
-        collection->getCursorManager()->registerExecutor(exec);
+        size_t registrationToken = collection->getCursorManager()->registerExecutor(exec);
         wunit.commit();
+        return registrationToken;
     }
 
-    void deregisterExec(PlanExecutor* exec) {
+    void deregisterExec(PlanExecutor* exec, size_t registrationToken) {
         // TODO: This is not correct (create collection under S-lock)
         AutoGetCollectionForRead ctx(&_txn, nss.ns());
         WriteUnitOfWork wunit(&_txn);
         Collection* collection = ctx.getDb()->getOrCreateCollection(&_txn, nss.ns());
-        collection->getCursorManager()->deregisterExecutor(exec);
+        collection->getCursorManager()->deregisterExecutor(exec, registrationToken);
         wunit.commit();
     }
 
@@ -217,7 +218,7 @@ public:
 
         Collection* coll = ctx.getCollection();
         unique_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
-        registerExec(exec.get());
+        size_t token = registerExec(exec.get());
 
         BSONObj objOut;
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
@@ -228,7 +229,7 @@ public:
         dropCollection();
         ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
 
-        deregisterExec(exec.get());
+        deregisterExec(exec.get(), token);
     }
 };
 
@@ -246,7 +247,7 @@ public:
         addIndex(indexSpec);
 
         unique_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
-        registerExec(exec.get());
+        size_t token = registerExec(exec.get());
 
         BSONObj objOut;
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
@@ -257,7 +258,7 @@ public:
         dropCollection();
         ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
 
-        deregisterExec(exec.get());
+        deregisterExec(exec.get(), token);
     }
 };
 
@@ -298,7 +299,7 @@ public:
         unique_ptr<PlanExecutor> outerExec = std::move(statusWithPlanExecutor.getValue());
 
         // Only the outer executor gets registered.
-        registerExec(outerExec.get());
+        size_t token = registerExec(outerExec.get());
 
         // Verify that both the "inner" and "outer" plan executors have been killed after
         // dropping the collection.
@@ -307,7 +308,7 @@ public:
         ASSERT_EQUALS(PlanExecutor::DEAD, innerExec->getNext(&objOut, NULL));
         ASSERT_EQUALS(PlanExecutor::DEAD, outerExec->getNext(&objOut, NULL));
 
-        deregisterExec(outerExec.get());
+        deregisterExec(outerExec.get(), token);
     }
 };
 

@@ -595,13 +595,13 @@ PlanExecutor::ScopedExecutorRegistration::ScopedExecutorRegistration(PlanExecuto
     // Collection can be null for an EOFStage plan, or other places where registration
     // is not needed.
     if (_exec->collection()) {
-        _exec->collection()->getCursorManager()->registerExecutor(exec);
+        _registrationToken = _exec->collection()->getCursorManager()->registerExecutor(exec);
     }
 }
 
 PlanExecutor::ScopedExecutorRegistration::~ScopedExecutorRegistration() {
     if (_exec->collection()) {
-        _exec->collection()->getCursorManager()->deregisterExecutor(_exec);
+        _exec->collection()->getCursorManager()->deregisterExecutor(_exec, _registrationToken);
     }
 }
 

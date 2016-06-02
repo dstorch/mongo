@@ -393,7 +393,10 @@ private:
         ScopedExecutorRegistration(PlanExecutor* exec);
         ~ScopedExecutorRegistration();
 
+    private:
         PlanExecutor* const _exec;
+
+        size_t _registrationToken;
     };
 
     /**

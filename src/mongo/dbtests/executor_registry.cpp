@@ -94,21 +94,23 @@ public:
         return statusWithPlanExecutor.getValue().release();
     }
 
-    void registerExecutor(PlanExecutor* exec) {
+    size_t registerExecutor(PlanExecutor* exec) {
         WriteUnitOfWork wuow(&_opCtx);
-        _ctx->db()
-            ->getOrCreateCollection(&_opCtx, nss.ns())
-            ->getCursorManager()
-            ->registerExecutor(exec);
+        size_t registrationToken = _ctx->db()
+                                       ->getOrCreateCollection(&_opCtx, nss.ns())
+                                       ->getCursorManager()
+                                       ->registerExecutor(exec);
         wuow.commit();
+
+        return registrationToken;
     }
 
-    void deregisterExecutor(PlanExecutor* exec) {
+    void deregisterExecutor(PlanExecutor* exec, size_t registrationToken) {
         WriteUnitOfWork wuow(&_opCtx);
         _ctx->db()
             ->getOrCreateCollection(&_opCtx, nss.ns())
             ->getCursorManager()
-            ->deregisterExecutor(exec);
+            ->deregisterExecutor(exec, registrationToken);
         wuow.commit();
     }
 
@@ -147,7 +149,7 @@ public:
 
         // Register it.
         run->saveState();
-        registerExecutor(run.get());
+        size_t token = registerExecutor(run.get());
         // At this point it's safe to yield.  forceYield would do that.  Let's now simulate some
         // stuff going on in the yield.
 
@@ -158,7 +160,7 @@ public:
         // At this point, we're done yielding.  We recover our lock.
 
         // Unregister the runner.
-        deregisterExecutor(run.get());
+        deregisterExecutor(run.get(), token);
 
         // And clean up anything that happened before.
         run->restoreState();
@@ -189,13 +191,13 @@ public:
 
         // Save state and register.
         run->saveState();
-        registerExecutor(run.get());
+        size_t token = registerExecutor(run.get());
 
         // Drop a collection that's not ours.
         _client.dropCollection("unittests.someboguscollection");
 
         // Unregister and restore state.
-        deregisterExecutor(run.get());
+        deregisterExecutor(run.get(), token);
         run->restoreState();
 
         ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
@@ -203,13 +205,13 @@ public:
 
         // Save state and register.
         run->saveState();
-        registerExecutor(run.get());
+        token = registerExecutor(run.get());
 
         // Drop our collection.
         _client.dropCollection(nss.ns());
 
         // Unregister and restore state.
-        deregisterExecutor(run.get());
+        deregisterExecutor(run.get(), token);
         run->restoreState();
 
         // PlanExecutor was killed.
@@ -234,13 +236,13 @@ public:
 
         // Save state and register.
         run->saveState();
-        registerExecutor(run.get());
+        size_t token = registerExecutor(run.get());
 
         // Drop all indices.
         _client.dropIndexes(nss.ns());
 
         // Unregister and restore state.
-        deregisterExecutor(run.get());
+        deregisterExecutor(run.get(), token);
         run->restoreState();
 
         // PlanExecutor was killed.
@@ -265,13 +267,13 @@ public:
 
         // Save state and register.
         run->saveState();
-        registerExecutor(run.get());
+        size_t token = registerExecutor(run.get());
 
         // Drop a specific index.
         _client.dropIndex(nss.ns(), BSON("foo" << 1));
 
         // Unregister and restore state.
-        deregisterExecutor(run.get());
+        deregisterExecutor(run.get(), token);
         run->restoreState();
 
         // PlanExecutor was killed.
@@ -294,7 +296,7 @@ public:
 
         // Save state and register.
         run->saveState();
-        registerExecutor(run.get());
+        size_t token = registerExecutor(run.get());
 
         // Drop a DB that's not ours.  We can't have a lock at all to do this as dropping a DB
         // requires a "global write lock."
@@ -303,7 +305,7 @@ public:
         _ctx.reset(new OldClientWriteContext(&_opCtx, nss.ns()));
 
         // Unregister and restore state.
-        deregisterExecutor(run.get());
+        deregisterExecutor(run.get(), token);
         run->restoreState();
 
         ASSERT_EQUALS(PlanExecutor::ADVANCED, run->getNext(&obj, NULL));
@@ -311,7 +313,7 @@ public:
 
         // Save state and register.
         run->saveState();
-        registerExecutor(run.get());
+        token = registerExecutor(run.get());
 
         // Drop our DB.  Once again, must give up the lock.
         _ctx.reset();
@@ -319,7 +321,7 @@ public:
         _ctx.reset(new OldClientWriteContext(&_opCtx, nss.ns()));
 
         // Unregister and restore state.
-        deregisterExecutor(run.get());
+        deregisterExecutor(run.get(), token);
         run->restoreState();
         _ctx.reset();
 

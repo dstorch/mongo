@@ -324,17 +324,18 @@ CursorManager::~CursorManager() {
 }
 
 void CursorManager::invalidateAll(bool collectionGoingAway, const std::string& reason) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    ExecutorRegistryPartitionGuard guardedRegistry(&_planExecutorRegistry);
+    stdx::lock_guard<SimpleMutex> lk(_cursorMapMutex);
+
     fassert(28819, !BackgroundOperation::inProgForNs(_nss));
 
-    for (ExecSet::iterator it = _nonCachedExecutors.begin(); it != _nonCachedExecutors.end();
-         ++it) {
-        // we kill the executor, but it deletes itself
-        PlanExecutor* exec = *it;
-        exec->kill(reason);
-        invariant(exec->collection() == NULL);
+    for (auto&& partition : _planExecutorRegistry.partitions) {
+        for (auto exec : partition.executors) {
+            exec->kill(reason);
+            invariant(!exec->collection());
+        }
+        partition.executors.clear();
     }
-    _nonCachedExecutors.clear();
 
     if (collectionGoingAway) {
         // we're going to wipe out the world
@@ -397,12 +398,13 @@ void CursorManager::invalidateDocument(OperationContext* txn,
         return;
     }
 
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    ExecutorRegistryPartitionGuard guardedRegistry(&_planExecutorRegistry);
+    stdx::lock_guard<SimpleMutex> lk(_cursorMapMutex);
 
-    for (ExecSet::iterator it = _nonCachedExecutors.begin(); it != _nonCachedExecutors.end();
-         ++it) {
-        PlanExecutor* exec = *it;
-        exec->invalidate(txn, dl, type);
+    for (auto&& partition : _planExecutorRegistry.partitions) {
+        for (auto exec : partition.executors) {
+            exec->invalidate(txn, dl, type);
+        }
     }
 
     for (CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
@@ -414,7 +416,7 @@ void CursorManager::invalidateDocument(OperationContext* txn,
 }
 
 std::size_t CursorManager::timeoutCursors(int millisSinceLastCall) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    stdx::lock_guard<SimpleMutex> lk(_cursorMapMutex);
 
     vector<ClientCursor*> toDelete;
 
@@ -434,19 +436,21 @@ std::size_t CursorManager::timeoutCursors(int millisSinceLastCall) {
     return toDelete.size();
 }
 
-void CursorManager::registerExecutor(PlanExecutor* exec) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
-    const std::pair<ExecSet::iterator, bool> result = _nonCachedExecutors.insert(exec);
+size_t CursorManager::registerExecutor(PlanExecutor* exec) {
+    size_t partition = _planExecutorRegistry.nextPartition();
+    ExecutorRegistryPartitionGuard guardedRegistry(&_planExecutorRegistry, partition);
+    const auto result = guardedRegistry->insert(exec);
     invariant(result.second);  // make sure this was inserted
+    return partition;
 }
 
-void CursorManager::deregisterExecutor(PlanExecutor* exec) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
-    _nonCachedExecutors.erase(exec);
+void CursorManager::deregisterExecutor(PlanExecutor* exec, size_t partition) {
+    ExecutorRegistryPartitionGuard guardedRegistry(&_planExecutorRegistry, partition);
+    guardedRegistry->erase(exec);
 }
 
 ClientCursor* CursorManager::find(CursorId id, bool pin) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    stdx::lock_guard<SimpleMutex> lk(_cursorMapMutex);
     CursorMap::const_iterator it = _cursors.find(id);
     if (it == _cursors.end())
         return NULL;
@@ -461,7 +465,7 @@ ClientCursor* CursorManager::find(CursorId id, bool pin) {
 }
 
 void CursorManager::unpin(ClientCursor* cursor) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    stdx::lock_guard<SimpleMutex> lk(_cursorMapMutex);
 
     invariant(cursor->isPinned());
     cursor->unsetPinned();
@@ -472,7 +476,7 @@ bool CursorManager::ownsCursorId(CursorId cursorId) const {
 }
 
 void CursorManager::getCursorIds(std::set<CursorId>* openCursors) const {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    stdx::lock_guard<SimpleMutex> lk(_cursorMapMutex);
 
     for (CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
         ClientCursor* cc = i->second;
@@ -481,7 +485,7 @@ void CursorManager::getCursorIds(std::set<CursorId>* openCursors) const {
 }
 
 size_t CursorManager::numCursors() const {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    stdx::lock_guard<SimpleMutex> lk(_cursorMapMutex);
     return _cursors.size();
 }
 
@@ -497,19 +501,19 @@ CursorId CursorManager::_allocateCursorId_inlock() {
 
 CursorId CursorManager::registerCursor(ClientCursor* cc) {
     invariant(cc);
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    stdx::lock_guard<SimpleMutex> lk(_cursorMapMutex);
     CursorId id = _allocateCursorId_inlock();
     _cursors[id] = cc;
     return id;
 }
 
 void CursorManager::deregisterCursor(ClientCursor* cc) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    stdx::lock_guard<SimpleMutex> lk(_cursorMapMutex);
     _deregisterCursor_inlock(cc);
 }
 
 Status CursorManager::eraseCursor(OperationContext* txn, CursorId id, bool shouldAudit) {
-    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    stdx::lock_guard<SimpleMutex> lk(_cursorMapMutex);
 
     CursorMap::iterator it = _cursors.find(id);
     if (it == _cursors.end()) {

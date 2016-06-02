@@ -1444,6 +1444,7 @@ public:
                 auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
                 lpq->setFilter(config.filter);
                 lpq->setSort(config.sort);
+                lpq->setCollation(config.collation);
 
                 const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 

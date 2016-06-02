@@ -1,15 +1,14 @@
-// Ensure that shell helpers correctly deliver the collation to the server.
-//
-// TODO SERVER-23791: Once we have an end-to-end working on mongod, we should be able to strengthen
-// the assertions in this file in order to ensure that the server is correctly respecting the
-// assertion. Currently we exercise the code paths in the shell that are supposed to propagate the
-// collation to the server, but we don't require that the result of executing the command respects
-// the collation.
+// Integration tests for the collation feature.
 (function() {
     'use strict';
 
+    load("jstests/libs/analyze_plan.js");
+
     var coll = db.collation_shell_helpers;
     coll.drop();
+
+    var explainRes;
+    var planStage;
 
     var assertIndexHasCollation = function(keyPattern, collation) {
         var foundIndex = false;
@@ -152,9 +151,45 @@
         backwards: true
     });
 
-    // TODO SERVER-23791: Test that queries with matching collations can use these indices, and that
-    // the indices contain collator-generated comparison keys rather than the verbatim indexed
-    // strings.
+    // Test that an index with a non-simple collation contains collator-generated comparison keys
+    // rather than the verbatim indexed strings.
+    if (db.getMongo().useReadCommands()) {
+        coll.drop();
+        assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
+        assert.commandWorked(coll.createIndex({b: 1}));
+        assert.writeOK(coll.insert({a: "foo", b: "foo"}));
+        assert.eq(
+            1, coll.find({}, {_id: 0, a: 1}).collation({locale: "fr_CA"}).hint({a: 1}).itcount());
+        assert.neq(
+            "foo",
+            coll.find({}, {_id: 0, a: 1}).collation({locale: "fr_CA"}).hint({a: 1}).next().a);
+        assert.eq(
+            1, coll.find({}, {_id: 0, b: 1}).collation({locale: "fr_CA"}).hint({b: 1}).itcount());
+        assert.eq("foo",
+                  coll.find({}, {_id: 0, b: 1}).collation({locale: "fr_CA"}).hint({b: 1}).next().b);
+    }
+
+    // Test that a query with a string comparison can use an index with a non-simple collation if it
+    // has a matching collation.
+    if (db.getMongo().useReadCommands()) {
+        coll.drop();
+        assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
+
+        // Query has simple collation, but index has fr_CA collation.
+        explainRes = coll.find({a: "foo"}).explain();
+        assert.commandWorked(explainRes);
+        assert(planHasStage(explainRes.queryPlanner.winningPlan, "COLLSCAN"));
+
+        // Query has en_US collation, but index has fr_CA collation.
+        explainRes = coll.find({a: "foo"}).collation({locale: "en_US"}).explain();
+        assert.commandWorked(explainRes);
+        assert(planHasStage(explainRes.queryPlanner.winningPlan, "COLLSCAN"));
+
+        // Matching collations.
+        explainRes = coll.find({a: "foo"}).collation({locale: "fr_CA"}).explain();
+        assert.commandWorked(explainRes);
+        assert(planHasStage(explainRes.queryPlanner.winningPlan, "IXSCAN"));
+    }
 
     //
     // Test helpers for operations that accept a collation.
@@ -165,7 +200,10 @@
     assert.writeOK(coll.insert({_id: 2, str: "bar"}));
 
     // Aggregation.
-    assert.eq(2, coll.aggregate([], {collation: {locale: "fr"}}).itcount());
+    assert.eq(0, coll.aggregate([{$match: {str: "FOO"}}]).itcount());
+    assert.eq(1,
+              coll.aggregate([{$match: {str: "FOO"}}], {collation: {locale: "en_US", strength: 2}})
+                  .itcount());
     assert.commandWorked(coll.explain().aggregate([], {collation: {locale: "fr"}}));
 
     // Count command.
@@ -175,7 +213,22 @@
     assert.eq(0, coll.count({str: "FOO"}));
     assert.eq(0, coll.count({str: "FOO"}, {collation: {locale: "en_US"}}));
     assert.eq(1, coll.count({str: "FOO"}, {collation: {locale: "en_US", strength: 2}}));
-    assert.commandWorked(coll.explain().find().collation({locale: "fr"}).count());
+
+    explainRes =
+        coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US"}).count();
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "COLLSCAN");
+    assert.neq(null, planStage);
+    assert.eq(0, planStage.advanced);
+
+    explainRes = coll.explain("executionStats")
+                     .find({str: "FOO"})
+                     .collation({locale: "en_US", strength: 2})
+                     .count();
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "COLLSCAN");
+    assert.neq(null, planStage);
+    assert.eq(1, planStage.advanced);
 
     // Distinct.
     assert.eq(["foo", "bar"], coll.distinct("str", {}, {collation: {locale: "fr"}}));
@@ -208,7 +261,8 @@
         assert.commandWorked(coll.dropIndexes());
 
         // With a partial index.
-        // {_id: 1, str: "foo"} will be indexed even though "foo" > "FOO", since the collation is
+        // {_id: 1, str: "foo"} will be indexed even though "foo" > "FOO", since the collation
+        // is
         // case-insensitive.
         assert.commandWorked(coll.ensureIndex({str: 1}, {
             partialFilterExpression: {str: {$lte: "FOO"}},
@@ -232,37 +286,85 @@
             coll.find().collation({locale: "fr"}).itcount();
         });
     }
-    // Explain of find always uses the find command, so this will succeed regardless of readMode.
-    assert.commandWorked(coll.explain().find().collation({locale: "fr"}).finish());
-    assert.commandWorked(coll.find().collation({locale: "fr"}).explain());
 
-    // findAndModify.
-    assert.eq({_id: 2, str: "baz"}, coll.findAndModify({
-        query: {str: "bar"},
+    // Explain of find always uses the find command, so this will succeed regardless of readMode.
+    explainRes =
+        coll.explain("executionStats").find({str: "FOO"}).collation({locale: "en_US"}).finish();
+    assert.commandWorked(explainRes);
+    assert.eq(0, explainRes.executionStats.nReturned);
+    explainRes = coll.explain("executionStats")
+                     .find({str: "FOO"})
+                     .collation({locale: "en_US", strength: 2})
+                     .finish();
+    assert.commandWorked(explainRes);
+    assert.eq(1, explainRes.executionStats.nReturned);
+
+    // Update via findAndModify.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+    assert.eq({_id: 1, str: "baz"}, coll.findAndModify({
+        query: {str: "FOO"},
         update: {$set: {str: "baz"}},
         new: true,
-        collation: {locale: "fr"}
+        collation: {locale: "en_US", strength: 2}
     }));
-    assert.commandWorked(coll.explain().findAndModify(
-        {query: {str: "bar"}, update: {$set: {str: "baz"}}, new: true, collation: {locale: "fr"}}));
+    explainRes = coll.explain("executionStats").findAndModify({
+        query: {str: "BAR"},
+        update: {$set: {str: "baz"}},
+        new: true,
+        collation: {locale: "en_US", strength: 2}
+    });
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "UPDATE");
+    assert.neq(null, planStage);
+    assert.eq(1, planStage.nWouldModify);
+
+    // Delete via findAndModify.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+    assert.eq({_id: 1, str: "foo"}, coll.findAndModify({
+        query: {str: "FOO"},
+        remove: true,
+        collation: {locale: "en_US", strength: 2}
+    }));
+    explainRes = coll.explain("executionStats").findAndModify({
+        query: {str: "BAR"},
+        remove: true,
+        collation: {locale: "en_US", strength: 2}
+    });
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "DELETE");
+    assert.neq(null, planStage);
+    assert.eq(1, planStage.nWouldDelete);
 
     // Group.
-    assert.eq([{str: "foo", count: 1}, {str: "baz", count: 1}], coll.group({
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 1, str: "foo"}));
+    assert.writeOK(coll.insert({_id: 2, str: "bar"}));
+    assert.eq([{str: "foo", count: 1}], coll.group({
+        cond: {str: "FOO"},
         key: {str: 1},
         initial: {count: 0},
         reduce: function(curr, result) {
             result.count += 1;
         },
-        collation: {locale: "fr"}
+        collation: {locale: "en_US", strength: 2}
     }));
-    assert.commandWorked(coll.explain().group({
+    explainRes = coll.explain("executionStats").group({
+        cond: {str: "FOO"},
         key: {str: 1},
         initial: {count: 0},
         reduce: function(curr, result) {
             result.count += 1;
         },
-        collation: {locale: "fr"}
-    }));
+        collation: {locale: "en_US", strength: 2}
+    });
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "GROUP");
+    assert.neq(null, planStage);
+    assert.eq(planStage.nGroups, 1);
 
     // mapReduce.
     var mapReduceOut = coll.mapReduce(
@@ -272,24 +374,33 @@
         function(key, values) {
             return Array.sum(values);
         },
-        {out: {inline: 1}, collation: {locale: "fr"}});
+        {out: {inline: 1}, query: {str: "FOO"}, collation: {locale: "en_US", strength: 2}});
     assert.commandWorked(mapReduceOut);
-    assert.eq(mapReduceOut.results.length, 2);
+    assert.eq(mapReduceOut.results.length, 1);
 
     // Remove.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "foo"}));
     if (db.getMongo().writeMode() === "commands") {
-        assert.commandWorked(
-            coll.explain().remove({str: "foo"}, {justOne: true, collation: {locale: "fr"}}));
-        assert.writeOK(coll.remove({str: "foo"}, {justOne: true, collation: {locale: "fr"}}));
+        explainRes = coll.explain("executionStats").remove(
+            {str: "FOO"}, {justOne: true, collation: {locale: "en_US", strength: 2}});
+        assert.commandWorked(explainRes);
+        planStage = getPlanStage(explainRes.executionStats.executionStages, "DELETE");
+        assert.neq(null, planStage);
+        assert.eq(1, planStage.nWouldDelete);
+
+        var writeRes =
+            coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "en_US", strength: 2}});
+        assert.writeOK(writeRes);
+        assert.eq(1, writeRes.nRemoved);
     } else {
         assert.throws(function() {
-            coll.remove({str: "foo"}, {justOne: true, collation: {locale: "fr"}});
+            coll.remove({str: "FOO"}, {justOne: true, collation: {locale: "en_US", strength: 2}});
         });
         assert.throws(function() {
-            coll.explain().remove({str: "foo"}, {justOne: true, collation: {locale: "fr"}});
+            coll.explain().remove({str: "FOO"},
+                                  {justOne: true, collation: {locale: "en_US", strength: 2}});
         });
     }
 
@@ -298,18 +409,29 @@
     assert.writeOK(coll.insert({_id: 1, str: "foo"}));
     assert.writeOK(coll.insert({_id: 2, str: "foo"}));
     if (db.getMongo().writeMode() === "commands") {
-        assert.commandWorked(coll.explain().update(
-            {str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}}));
-        assert.writeOK(coll.update(
-            {str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}}));
+        explainRes = coll.explain("executionStats").update({str: "FOO"}, {$set: {other: 99}}, {
+            multi: true,
+            collation: {locale: "en_US", strength: 2}
+        });
+        assert.commandWorked(explainRes);
+        planStage = getPlanStage(explainRes.executionStats.executionStages, "UPDATE");
+        assert.neq(null, planStage);
+        assert.eq(2, planStage.nWouldModify);
+
+        var writeRes = coll.update({str: "FOO"},
+                                   {$set: {other: 99}},
+                                   {multi: true, collation: {locale: "en_US", strength: 2}});
+        assert.eq(2, writeRes.nModified);
     } else {
         assert.throws(function() {
-            coll.update(
-                {str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}});
+            coll.update({str: "FOO"},
+                        {$set: {other: 99}},
+                        {multi: true, collation: {locale: "en_US", strength: 2}});
         });
         assert.throws(function() {
-            coll.explain().update(
-                {str: "foo"}, {$set: {other: 99}}, {multi: true, collation: {locale: "fr"}});
+            coll.explain().update({str: "FOO"},
+                                  {$set: {other: 99}},
+                                  {multi: true, collation: {locale: "en_US", strength: 2}});
         });
     }
 

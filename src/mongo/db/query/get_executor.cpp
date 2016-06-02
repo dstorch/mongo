@@ -942,6 +942,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
     const NamespaceString nss(request.ns);
     auto lpq = stdx::make_unique<LiteParsedQuery>(nss);
     lpq->setFilter(request.query);
+    lpq->setCollation(request.collation);
     lpq->setExplain(request.explain);
 
     const ExtensionsCallbackReal extensionsCallback(txn, &nss);

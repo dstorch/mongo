@@ -23,6 +23,8 @@ selector:
     - jstests/sharding/shard_collection_verify_initial_chunks.js
     # TODO: Enable when SERVER-22672 is complete
     - jstests/sharding/printShardingStatus.js
+    # Assumes mapReduce can handle the collation option.
+    - jstests/sharding/mapReduce_inSharded.js
 
 executor:
   js_test:

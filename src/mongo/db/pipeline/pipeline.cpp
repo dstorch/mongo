@@ -221,11 +221,10 @@ void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
     }
 }
 
-void Pipeline::setCollator(std::unique_ptr<CollatorInterface> collator) {
-    pCtx->collator = std::move(collator);
-
-    // TODO SERVER-23349: If the pipeline has any DocumentSourceMatch sources, ask them to
-    // re-parse their predicates.
+void Pipeline::injectExpressionContext(const intrusive_ptr<ExpressionContext>& expCtx) {
+    for (auto&& stage : _sources) {
+        stage->injectExpressionContext(pCtx);
+    }
 }
 
 intrusive_ptr<Pipeline> Pipeline::splitForSharded() {
@@ -461,4 +460,5 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
 
     return deps;
 }
+
 }  // namespace mongo

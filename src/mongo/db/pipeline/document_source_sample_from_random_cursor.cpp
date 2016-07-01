@@ -76,7 +76,7 @@ double smallestFromSampleOfUniform(PseudoRandom* prng, size_t N) {
 boost::optional<Document> DocumentSourceSampleFromRandomCursor::getNext() {
     pExpCtx->checkForInterrupt();
 
-    if (_seenDocs.size() >= static_cast<size_t>(_size))
+    if (_seenDocs->size() >= static_cast<size_t>(_size))
         return {};
 
     auto doc = getNextNonDuplicateDocument();
@@ -114,7 +114,7 @@ boost::optional<Document> DocumentSourceSampleFromRandomCursor::getNextNonDuplic
                 << (*doc).toString(),
             !idField.missing());
 
-        if (_seenDocs.insert(std::move(idField)).second) {
+        if (_seenDocs->insert(std::move(idField)).second) {
             return doc;
         }
         LOG(1) << "$sample encountered duplicate document: " << (*doc).toString() << std::endl;
@@ -134,6 +134,10 @@ DocumentSource::GetDepsReturn DocumentSourceSampleFromRandomCursor::getDependenc
     DepsTracker* deps) const {
     deps->fields.insert(_idField);
     return SEE_NEXT;
+}
+
+void DocumentSourceSampleFromRandomCursor::doInjectExpressionContext() {
+    _seenDocs = pExpCtx->getValueComparator().makeUnorderedValueSet();
 }
 
 intrusive_ptr<DocumentSourceSampleFromRandomCursor> DocumentSourceSampleFromRandomCursor::create(

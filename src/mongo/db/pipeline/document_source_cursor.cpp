@@ -221,6 +221,12 @@ Value DocumentSourceCursor::serialize(bool explain) const {
     return Value(DOC(getSourceName() << out.freezeToValue()));
 }
 
+void DocumentSourceCursor::doInjectExpressionContext() {
+    if (_limit) {
+        _limit->injectExpressionContext(pExpCtx);
+    }
+}
+
 DocumentSourceCursor::DocumentSourceCursor(const string& ns,
                                            const std::shared_ptr<PlanExecutor>& exec,
                                            const intrusive_ptr<ExpressionContext>& pCtx)

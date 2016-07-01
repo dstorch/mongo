@@ -37,7 +37,9 @@ env.Library(
     target='document_value',
     source=[
         'document.cpp',
+        'document_comparator.cpp',
         'value.cpp',
+        'value_comparator.cpp',
         ],
     LIBDEPS=[
         'field_path',

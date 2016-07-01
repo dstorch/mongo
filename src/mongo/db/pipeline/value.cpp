@@ -638,7 +638,9 @@ inline static int cmp(const T& left, const T& right) {
     }
 }
 
-int Value::compare(const Value& rL, const Value& rR) {
+int Value::compare(const Value& rL,
+                   const Value& rR,
+                   const StringData::ComparatorInterface* stringComparator) {
     // Note, this function needs to behave identically to BSON's compareElementValues().
     // Additionally, any changes here must be replicated in hash_combine().
     BSONType lType = rL.getType();
@@ -739,9 +741,16 @@ int Value::compare(const Value& rL, const Value& rR) {
         case jstOID:
             return memcmp(rL._storage.oid, rR._storage.oid, OID::kOIDSize);
 
+        case String: {
+            if (!stringComparator) {
+                return rL.getStringData().compare(rR.getStringData());
+            }
+
+            return stringComparator->compare(rL.getStringData(), rR.getStringData());
+        }
+
         case Code:
         case Symbol:
-        case String:
             return rL.getStringData().compare(rR.getStringData());
 
         case Object:

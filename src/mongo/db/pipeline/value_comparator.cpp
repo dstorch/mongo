@@ -25,3 +25,33 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/pipeline/value_comparator.h"
+
+#include "mongo/base/assert_util.h"
+
+namespace mongo {
+
+bool ValueComparator::evaluate(Value::DeferredComparison deferredComparison) const {
+    int cmp = Value::compare(deferredComparison.lhs, deferredComparison.rhs, _stringComparator);
+    switch (deferredComparison.type) {
+        case Value::DeferredComparison::Type::kLT:
+            return cmp < 0;
+        case Value::DeferredComparison::Type::kLTE:
+            return cmp <= 0;
+        case Value::DeferredComparison::Type::kEQ:
+            return cmp == 0;
+        case Value::DeferredComparison::Type::kGTE:
+            return cmp >= 0;
+        case Value::DeferredComparison::Type::kGT:
+            return cmp > 0;
+        case Value::DeferredComparison::Type::kNE:
+            return cmp != 0;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+}  // namespace mongo

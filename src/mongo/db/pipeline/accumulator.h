@@ -37,6 +37,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/summation.h"
 
@@ -137,8 +138,7 @@ public:
     }
 
 private:
-    typedef std::unordered_set<Value, Value::Hash> SetType;
-    SetType set;
+    ValueUnorderedSet set;
 };
 
 

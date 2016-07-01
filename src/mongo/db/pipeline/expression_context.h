@@ -35,6 +35,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/document_comparator.h"
+#include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -68,6 +70,10 @@ public:
     // Collator used to compare elements. 'collator' is initialized from 'collation', except in the
     // case where 'collation' is empty and there is a collection default collation.
     std::unique_ptr<CollatorInterface> collator;
+
+    // Used for all comparisons of Document/Value during execution of the aggregation operation.
+    DocumentComparator documentComparator;
+    ValueComparator valueComparator;
 
     static const int kInterruptCheckPeriod = 128;
     int interruptCounter = kInterruptCheckPeriod;  // when 0, check interruptStatus

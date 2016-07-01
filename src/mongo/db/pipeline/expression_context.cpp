@@ -46,7 +46,12 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx, const AggregationR
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
         uassertStatusOK(statusWithCollator.getStatus());
         collator = std::move(statusWithCollator.getValue());
+
+        // Document/Value comparisons must be aware of the collation.
+        documentComparator = DocumentComparator(collator.get());
+        valueComparator = ValueComparator(collator.get());
     }
+
 }
 
 void ExpressionContext::checkForInterrupt() {

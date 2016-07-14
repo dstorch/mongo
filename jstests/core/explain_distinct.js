@@ -80,7 +80,7 @@
     assert.eq([1], coll.distinct('b', {a: 1}));
     var explain = runDistinctExplain(coll, 'b', {a: 1});
     assert.commandWorked(explain);
-    assert.eq(10, explain.executionStats.nReturned);
+    assert.eq(1, explain.executionStats.nReturned);
     assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
     assert(isIxscan(explain.queryPlanner.winningPlan));
 })();

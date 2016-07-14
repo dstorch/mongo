@@ -459,6 +459,7 @@ protected:
         expressionContext->tempDir = _tempDir.path();
 
         _group = DocumentSourceGroup::createFromBson(specElement, expressionContext);
+        _group->injectExpressionContext(expressionContext);
         assertRoundTrips(_group);
     }
     DocumentSourceGroup* group() {
@@ -3044,8 +3045,8 @@ using std::unique_ptr;
 
 // Helpers to make a DocumentSourceMatch from a query object or json string
 intrusive_ptr<DocumentSourceMatch> makeMatch(const BSONObj& query) {
-    intrusive_ptr<DocumentSource> uncasted =
-        DocumentSourceMatch::createFromBson(BSON("$match" << query).firstElement(), NULL);
+    intrusive_ptr<DocumentSource> uncasted = DocumentSourceMatch::createFromBson(
+        BSON("$match" << query).firstElement(), new ExpressionContext());
     return dynamic_cast<DocumentSourceMatch*>(uncasted.get());
 }
 intrusive_ptr<DocumentSourceMatch> makeMatch(const string& queryJson) {

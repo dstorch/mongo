@@ -245,7 +245,9 @@ intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     const string& ns,
     const std::shared_ptr<PlanExecutor>& exec,
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    return new DocumentSourceCursor(ns, exec, pExpCtx);
+    intrusive_ptr<DocumentSourceCursor> source(new DocumentSourceCursor(ns, exec, pExpCtx));
+    source->injectExpressionContext(pExpCtx);
+    return source;
 }
 
 void DocumentSourceCursor::setProjection(const BSONObj& projection,

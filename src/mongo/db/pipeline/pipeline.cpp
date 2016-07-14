@@ -222,6 +222,7 @@ void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
 }
 
 void Pipeline::injectExpressionContext(const intrusive_ptr<ExpressionContext>& expCtx) {
+    pCtx = expCtx;
     for (auto&& stage : _sources) {
         stage->injectExpressionContext(pCtx);
     }

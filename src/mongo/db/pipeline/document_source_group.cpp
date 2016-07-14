@@ -254,7 +254,9 @@ DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(DepsTracker* 
 
 intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    return new DocumentSourceGroup(pExpCtx);
+    intrusive_ptr<DocumentSourceGroup> source(new DocumentSourceGroup(pExpCtx));
+    source->injectExpressionContext(pExpCtx);
+    return source;
 }
 
 DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& pExpCtx)

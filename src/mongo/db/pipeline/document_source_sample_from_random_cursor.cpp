@@ -145,6 +145,9 @@ intrusive_ptr<DocumentSourceSampleFromRandomCursor> DocumentSourceSampleFromRand
     long long size,
     std::string idField,
     long long nDocsInCollection) {
-    return new DocumentSourceSampleFromRandomCursor(expCtx, size, idField, nDocsInCollection);
+    intrusive_ptr<DocumentSourceSampleFromRandomCursor> source(
+        new DocumentSourceSampleFromRandomCursor(expCtx, size, idField, nDocsInCollection));
+    source->injectExpressionContext(expCtx);
+    return source;
 }
 }  // mongo

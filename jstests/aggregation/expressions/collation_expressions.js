@@ -2,137 +2,92 @@
 (function() {
     "use strict";
 
+    load("jstests/aggregation/extras/utils.js");
+
     var coll = db.collation_expressions;
     coll.drop();
 
     var results;
-    var caseInsensitive = {collation: {locale: "en_US", strength: 2}};
-    var numericOrdering = {collation: {locale: "en_US", numericOrdering: true}};
+    const caseInsensitive = {locale: "en_US", strength: 2};
+    const numericOrdering = {locale: "en_US", numericOrdering: true};
 
     // Test that $cmp respects the collection-default collation.
-    assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
-    assert.writeOK(coll.insert({_id: 1}));
-    results = coll.aggregate([{$project: {out: {$cmp: ["a", "A"]}}}]).toArray();
-    assert.eq(1, results.length);
-    assert.eq(0, results[0].out);
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: caseInsensitive}));
+    testExpression(coll, {$cmp: ["a", "A"]}, 0);
 
     coll.drop();
-    assert.writeOK(coll.insert({_id: 1}));
 
     // Test that $cmp respects the collation.
-    results = coll.aggregate([{$project: {out: {$cmp: ["a", "A"]}}}], caseInsensitive).toArray();
-    assert.eq(1, results.length);
-    assert.eq(0, results[0].out);
+    testExpressionWithCollation(coll, {$cmp: ["a", "A"]}, 0, caseInsensitive);
 
     // Test that $eq respects the collation.
-    results = coll.aggregate([{$project: {out: {$eq: ["a", "A"]}}}], caseInsensitive).toArray();
-    assert.eq(1, results.length);
-    assert.eq(true, results[0].out);
+    testExpressionWithCollation(coll, {$eq: ["a", "A"]}, true, caseInsensitive);
 
     // Test that $ne respects the collation.
-    results = coll.aggregate([{$project: {out: {$ne: ["a", "A"]}}}], caseInsensitive).toArray();
-    assert.eq(1, results.length);
-    assert.eq(false, results[0].out);
+    testExpressionWithCollation(coll, {$ne: ["a", "A"]}, false, caseInsensitive);
 
     // Test that $lt respects the collation.
-    results = coll.aggregate([{$project: {out: {$lt: ["2", "10"]}}}], numericOrdering).toArray();
-    assert.eq(1, results.length);
-    assert.eq(true, results[0].out);
+    testExpressionWithCollation(coll, {$lt: ["2", "10"]}, true, numericOrdering);
 
     // Test that $lte respects the collation.
-    results = coll.aggregate([{$project: {out: {$lte: ["2", "10"]}}}], numericOrdering).toArray();
-    assert.eq(1, results.length);
-    assert.eq(true, results[0].out);
-    results = coll.aggregate([{$project: {out: {$lte: ["b", "B"]}}}], caseInsensitive).toArray();
-    assert.eq(1, results.length);
-    assert.eq(true, results[0].out);
+    testExpressionWithCollation(coll, {$lte: ["2", "10"]}, true, numericOrdering);
+    testExpressionWithCollation(coll, {$lte: ["b", "B"]}, true, caseInsensitive);
 
     // Test that $gt respects the collation.
-    results = coll.aggregate([{$project: {out: {$gt: ["2", "10"]}}}], numericOrdering).toArray();
-    assert.eq(1, results.length);
-    assert.eq(false, results[0].out);
+    testExpressionWithCollation(coll, {$gt: ["2", "10"]}, false, numericOrdering);
 
     // Test that $gte respects the collation.
-    results = coll.aggregate([{$project: {out: {$gte: ["2", "10"]}}}], numericOrdering).toArray();
-    assert.eq(1, results.length);
-    assert.eq(false, results[0].out);
-    results = coll.aggregate([{$project: {out: {$gte: ["b", "B"]}}}], caseInsensitive).toArray();
-    assert.eq(1, results.length);
-    assert.eq(true, results[0].out);
+    testExpressionWithCollation(coll, {$gte: ["2", "10"]}, false, numericOrdering);
+    testExpressionWithCollation(coll, {$gte: ["b", "B"]}, true, caseInsensitive);
 
     // Test that $in respects the collation.
-    results = coll.aggregate([{$project: {out: {$in: ["A", [1, 2, "a", 3, 4]]}}}], caseInsensitive)
-                  .toArray();
-    assert.eq(1, results.length);
-    assert.eq(true, results[0].out);
+    testExpressionWithCollation(coll, {$in: ["A", [1, 2, "a", 3, 4]]}, true, caseInsensitive);
 
     // Test that $indexOfArray respects the collation.
-    results =
-        coll.aggregate([{$project: {out: {$indexOfArray: [[1, 2, "a", "b", "c", "B"], "B"]}}}],
-                       caseInsensitive)
-            .toArray();
-    assert.eq(1, results.length);
-    assert.eq(3, results[0].out);
+    testExpressionWithCollation(
+        coll, {$indexOfArray: [[1, 2, "a", "b", "c", "B"], "B"]}, 3, caseInsensitive);
 
     // Test that $indexOfBytes doesn't respect the collation.
-    results = coll.aggregate([{$project: {out: {$indexOfBytes: ["12abcB", "B"]}}}], caseInsensitive)
-                  .toArray();
-    assert.eq(1, results.length);
-    assert.eq(5, results[0].out);
+    testExpressionWithCollation(coll, {$indexOfBytes: ["12abcB", "B"]}, 5, caseInsensitive);
 
     // Test that $indexOfCP doesn't respect the collation.
-    results = coll.aggregate([{$project: {out: {$indexOfCP: ["12abcB", "B"]}}}], caseInsensitive)
-                  .toArray();
-    assert.eq(1, results.length);
-    assert.eq(5, results[0].out);
+    testExpressionWithCollation(coll, {$indexOfCP: ["12abcB", "B"]}, 5, caseInsensitive);
 
     // Test that $setEquals respects the collation.
-    results =
-        coll.aggregate([{$project: {out: {$setEquals: [["a", "B"], ["b", "A"]]}}}], caseInsensitive)
-            .toArray();
-    assert.eq(1, results.length);
-    assert.eq(true, results[0].out);
+    testExpressionWithCollation(
+        coll, {$setEquals: [["a", "B"], ["b", "A"]]}, true, caseInsensitive);
 
     // Test that $setIntersection respects the collation.
     results =
         coll.aggregate([{$project: {out: {$setIntersection: [["a", "B", "c"], ["d", "b", "A"]]}}}],
-                       caseInsensitive)
+                       {collation: caseInsensitive})
             .toArray();
     assert.eq(1, results.length);
     assert.eq(2, results[0].out.length);
 
     // Test that $setUnion respects the collation.
     results = coll.aggregate([{$project: {out: {$setUnion: [["a", "B", "c"], ["d", "b", "A"]]}}}],
-                             caseInsensitive)
+                             {collation: caseInsensitive})
                   .toArray();
     assert.eq(1, results.length);
     assert.eq(4, results[0].out.length);
 
     // Test that $setDifference respects the collation.
-    results = coll.aggregate([{$project: {out: {$setDifference: [["a", "B"], ["b", "A"]]}}}],
-                             caseInsensitive)
-                  .toArray();
-    assert.eq(1, results.length);
-    assert.eq(0, results[0].out.length);
+    testExpressionWithCollation(coll, {$setDifference: [["a", "B"], ["b", "A"]]}, [],
+                             caseInsensitive);
 
     // Test that $setIsSubset respects the collation.
-    results = coll.aggregate([{$project: {out: {$setIsSubset: [["a", "B"], ["b", "A", "c"]]}}}],
-                             caseInsensitive)
-                  .toArray();
-    assert.eq(1, results.length);
-    assert.eq(true, results[0].out);
+    testExpressionWithCollation(
+        coll, {$setIsSubset: [["a", "B"], ["b", "A", "c"]]}, true, caseInsensitive);
 
     // Test that $split doesn't respect the collation.
-    results =
-        coll.aggregate([{$project: {out: {$split: ["abc", "B"]}}}], caseInsensitive).toArray();
-    assert.eq(1, results.length);
-    assert.eq(["abc"], results[0].out);
+    testExpressionWithCollation(coll, {$split: ["abc", "B"]}, ["abc"], caseInsensitive);
 
     // Test that an $and which can be optimized out respects the collation.
     coll.drop();
     assert.writeOK(coll.insert({_id: 1, str: "A"}));
     results = coll.aggregate([{$project: {out: {$and: [{$eq: ["$str", "a"]}, {$eq: ["b", "B"]}]}}}],
-                             caseInsensitive)
+                             {collation: caseInsensitive})
                   .toArray();
     assert.eq(1, results.length);
     assert.eq(true, results[0].out);

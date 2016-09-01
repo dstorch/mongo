@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,44 +28,20 @@
 
 #pragma once
 
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/net/hostandport.h"
+#if defined(_WIN32)
+#include <boost/unordered_map.hpp>
+#else
+#include <unordered_map>
+#endif
 
 namespace mongo {
-namespace executor {
+namespace stdx {
 
-/**
- * Holds connection information for a specific remote host. These objects are maintained by
- * a parent ConnectionPoolStats object and should not need to be created directly.
- */
-struct ConnectionStatsPerHost {
-    ConnectionStatsPerHost(size_t nInUse, size_t nAvailable, size_t nCreated);
+#if defined(_WIN32)
+using ::boost::unordered_map;  // NOLINT
+#else
+using ::std::unordered_map;  // NOLINT
+#endif
 
-    ConnectionStatsPerHost();
-
-    ConnectionStatsPerHost& operator+=(const ConnectionStatsPerHost& other);
-
-    size_t inUse = 0u;
-    size_t available = 0u;
-    size_t created = 0u;
-};
-
-/**
- * Aggregates connection information for the connPoolStats command. Connection pools should
- * use the updateStatsForHost() method to append their host-specific information to this object.
- * Total connection counts will then be updated accordingly.
- */
-struct ConnectionPoolStats {
-    void updateStatsForHost(HostAndPort host, ConnectionStatsPerHost newStats);
-
-    void appendToBSON(mongo::BSONObjBuilder& result);
-
-    size_t totalInUse = 0u;
-    size_t totalAvailable = 0u;
-    size_t totalCreated = 0u;
-
-    stdx::unordered_map<HostAndPort, ConnectionStatsPerHost> statsByHost;
-};
-
-}  // namespace executor
+}  // namespace stdx
 }  // namespace mongo

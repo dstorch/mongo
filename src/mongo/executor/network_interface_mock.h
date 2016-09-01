@@ -30,7 +30,6 @@
 
 #include <memory>
 #include <queue>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -41,6 +40,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -390,7 +390,7 @@ private:
     std::unordered_set<HostAndPort> _connections;  // (M)
 
     // The handshake replies set for each host.
-    std::unordered_map<HostAndPort, RemoteCommandResponse> _handshakeReplies;  // (M)
+    stdx::unordered_map<HostAndPort, RemoteCommandResponse> _handshakeReplies;  // (M)
 };
 
 /**

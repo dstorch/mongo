@@ -1619,9 +1619,9 @@ def make_polyfill_regex():
     'async',
     'bind',
     'chrono',
-    'cref',
     'condition_variable',
     'condition_variable_any',
+    'cref',
     'cv_status',
     'defer_lock',
     'function',
@@ -1644,6 +1644,7 @@ def make_polyfill_regex():
     'timed_mutex',
     'try_to_lock',
     'unique_lock',
+    'unordered_map',
   ]
 
   qualified_names = ['boost::' + name + "\\b" for name in polyfill_required_names]

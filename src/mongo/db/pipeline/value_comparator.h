@@ -30,11 +30,11 @@
 
 #include <map>
 #include <set>
-#include <unordered_map>
 #include <unordered_set>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -178,8 +178,8 @@ public:
      * this comparator. This comparator must outlive the returned set.
      */
     template <typename T>
-    std::unordered_map<Value, T, Hasher, EqualTo> makeUnorderedValueMap() const {
-        return std::unordered_map<Value, T, Hasher, EqualTo>(0, Hasher(this), EqualTo(this));
+    stdx::unordered_map<Value, T, Hasher, EqualTo> makeUnorderedValueMap() const {
+        return stdx::unordered_map<Value, T, Hasher, EqualTo>(0, Hasher(this), EqualTo(this));
     }
 
 private:
@@ -200,6 +200,6 @@ using ValueMap = std::map<Value, T, ValueComparator::LessThan>;
 
 template <typename T>
 using ValueUnorderedMap =
-    std::unordered_map<Value, T, ValueComparator::Hasher, ValueComparator::EqualTo>;
+    stdx::unordered_map<Value, T, ValueComparator::Hasher, ValueComparator::EqualTo>;
 
 }  // namespace mongo

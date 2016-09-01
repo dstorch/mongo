@@ -29,13 +29,13 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
 #include <unordered_set>
 
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -158,7 +158,7 @@ private:
     std::unordered_set<std::string> _inclusions;
 
     // TODO use StringMap once SERVER-23700 is resolved.
-    std::unordered_map<std::string, std::unique_ptr<InclusionNode>> _children;
+    stdx::unordered_map<std::string, std::unique_ptr<InclusionNode>> _children;
 };
 
 /**

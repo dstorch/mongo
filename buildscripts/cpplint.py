@@ -1645,6 +1645,7 @@ def make_polyfill_regex():
     'try_to_lock',
     'unique_lock',
     'unordered_map',
+    'unordered_set',
   ]
 
   qualified_names = ['boost::' + name + "\\b" for name in polyfill_required_names]

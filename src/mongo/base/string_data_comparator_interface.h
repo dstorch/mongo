@@ -28,10 +28,9 @@
 
 #pragma once
 
-#include <unordered_set>
-
 #include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "string_data.h"
 
 namespace mongo {
@@ -77,7 +76,7 @@ public:
         const ComparatorInterface* _stringComparator;
     };
 
-    using StringDataUnorderedSet = std::unordered_set<StringData, Hasher, EqualTo>;
+    using StringDataUnorderedSet = stdx::unordered_set<StringData, Hasher, EqualTo>;
 
     template <typename T>
     using StringDataUnorderedMap = stdx::unordered_map<StringData, T, Hasher, EqualTo>;

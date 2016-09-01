@@ -27,12 +27,12 @@
 */
 #pragma once
 
-#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -87,8 +87,8 @@ private:
     struct Node {
         // Note, a view may refer to the same child more than once, but we only need to know the
         // set of children and parents, since we do not need to traverse duplicates.
-        std::unordered_set<uint64_t> parents;
-        std::unordered_set<uint64_t> children;
+        stdx::unordered_set<uint64_t> parents;
+        stdx::unordered_set<uint64_t> children;
         std::string ns;
     };
 

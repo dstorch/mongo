@@ -324,8 +324,6 @@ private:
     std::shared_ptr<CallbackState> _callback;
 };
 
-size_t hash_value(const TaskExecutor::CallbackHandle& cbHandle);
-
 /**
  * Class representing a scheduled event and providing methods for interacting with it.
  */

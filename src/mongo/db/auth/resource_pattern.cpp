@@ -63,9 +63,4 @@ std::ostream& operator<<(std::ostream& os, const ResourcePattern& pattern) {
     return os << pattern.toString();
 }
 
-size_t hash_value(const ResourcePattern& resourcePattern) {
-    std::hash<ResourcePattern> hasher;
-    return hasher(resourcePattern);
-}
-
 }  // namespace mongo

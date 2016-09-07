@@ -131,8 +131,6 @@ private:
 
 std::ostream& operator<<(std::ostream& os, ProcessId pid);
 
-size_t hash_value(const ProcessId& pid);
-
 }  // namespace mongo
 
 MONGO_HASH_NAMESPACE_START

@@ -52,9 +52,4 @@ std::ostream& operator<<(std::ostream& os, const RoleName& name) {
     return os << name.getFullName();
 }
 
-size_t hash_value(const RoleName& roleName) {
-    std::hash<RoleName> hasher;
-    return hasher(roleName);
-}
-
 }  // namespace mongo

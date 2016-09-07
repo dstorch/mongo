@@ -180,6 +180,11 @@ std::ostream& operator<<(std::ostream& os, const HostAndPort& hp) {
     return os << hp.toString();
 }
 
+size_t hash_value(const HostAndPort& host) {
+    std::hash<HostAndPort> hasher;
+    return hasher(host);
+}
+
 }  // namespace mongo
 
 MONGO_HASH_NAMESPACE_START

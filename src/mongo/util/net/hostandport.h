@@ -124,6 +124,8 @@ private:
 
 std::ostream& operator<<(std::ostream& os, const HostAndPort& hp);
 
+size_t hash_value(const HostAndPort& host);
+
 }  // namespace mongo
 
 MONGO_HASH_NAMESPACE_START

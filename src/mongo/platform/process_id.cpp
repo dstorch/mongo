@@ -76,4 +76,9 @@ std::ostream& operator<<(std::ostream& os, ProcessId pid) {
     return os << pid.toNative();
 }
 
+size_t hash_value(const ProcessId& pid) {
+    std::hash<ProcessId> hasher;
+    return hasher(pid);
+}
+
 }  // namespace mongo

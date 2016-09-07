@@ -413,6 +413,8 @@ struct LockRequest {
  */
 const char* lockRequestStatusName(LockRequest::Status status);
 
+size_t hash_value(const ResourceId& resource);
+
 }  // namespace mongo
 
 

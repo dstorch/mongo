@@ -84,5 +84,9 @@ void TaskExecutor::setCallbackForHandle(CallbackHandle* cbHandle,
     cbHandle->setCallback(std::move(callback));
 }
 
+size_t hash_value(const TaskExecutor::CallbackHandle& cbHandle) {
+    return cbHandle.hash();
+}
+
 }  // namespace executor
 }  // namespace mongo

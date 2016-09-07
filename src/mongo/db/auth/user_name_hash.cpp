@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,35 +26,15 @@
  *    it in the license file.
  */
 
-#include "mongo/db/auth/role_name.h"
+#include "mongo/platform/basic.h"
 
-#include <algorithm>
-#include <iostream>
-#include <string>
-
-#include "mongo/base/string_data.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/auth/user_name_hash.h"
 
 namespace mongo {
 
-RoleName::RoleName(StringData role, StringData dbname) {
-    _fullName.resize(role.size() + dbname.size() + 1);
-    std::string::iterator iter =
-        std::copy(role.rawData(), role.rawData() + role.size(), _fullName.begin());
-    *iter = '@';
-    ++iter;
-    iter = std::copy(dbname.rawData(), dbname.rawData() + dbname.size(), iter);
-    dassert(iter == _fullName.end());
-    _splitPoint = role.size();
-}
-
-std::ostream& operator<<(std::ostream& os, const RoleName& name) {
-    return os << name.getFullName();
-}
-
-size_t hash_value(const RoleName& roleName) {
-    std::hash<RoleName> hasher;
-    return hasher(roleName);
+size_t hash_value(const UserName& username) {
+    std::hash<UserName> hasher;
+    return hasher(username);
 }
 
 }  // namespace mongo

@@ -176,6 +176,8 @@ MONGO_HASH_NAMESPACE_END
 
 namespace mongo {
 
+size_t hash_value(const RoleName& roleName);
+
 template <typename ContainerIterator>
 class RoleNameContainerIteratorImpl : public RoleNameIterator::Impl {
     MONGO_DISALLOW_COPYING(RoleNameContainerIteratorImpl);

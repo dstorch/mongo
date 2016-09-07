@@ -391,6 +391,8 @@ inline bool nsIsDbOnly(StringData ns) {
  */
 int nsDBHash(const std::string& ns);
 
+size_t hash_value(const NamespaceString& nss);
+
 }  // namespace mongo
 
 #include "mongo/db/namespace_string-inl.h"

@@ -205,6 +205,8 @@ private:
 
 std::ostream& operator<<(std::ostream& os, const ResourcePattern& pattern);
 
+size_t hash_value(const ResourcePattern& resourcePattern);
+
 }  // namespace mongo
 
 MONGO_HASH_NAMESPACE_START

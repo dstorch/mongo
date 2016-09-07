@@ -3,11 +3,11 @@
 
 #include "mongo/platform/hash_namespace.h"
 
-#include "mongo/platform/unordered_map.h"
-#define hash_map mongo::unordered_map
+#include <unordered_map>
+#define hash_map std::unordered_map
 
-#include "mongo/platform/unordered_set.h"
-#define hash_set mongo::unordered_set
+#include <unordered_set>
+#define hash_set std::unordered_set
 
 #define HASH_NAMESPACE_START MONGO_HASH_NAMESPACE_START
 #define HASH_NAMESPACE_END MONGO_HASH_NAMESPACE_END

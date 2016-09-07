@@ -153,4 +153,9 @@ std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss) {
     return stream << nss.toString();
 }
 
+size_t hash_value(const NamespaceString& nss) {
+    std::hash<NamespaceString> hasher;
+    return hasher(nss);
+}
+
 }  // namespace mongo

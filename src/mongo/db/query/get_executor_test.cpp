@@ -124,7 +124,7 @@ TEST(GetExecutorTest, GetAllowedIndices) {
          IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
          IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1, b: 1}")}),
-        {},
+        stdx::unordered_set<std::string>{},
         {"a_1_b_1"});
 }
 
@@ -137,8 +137,8 @@ TEST(GetExecutorTest, GetAllowedIndicesNonExistentIndexKeyPatterns) {
          IndexEntry(fromjson("{a: 1, b: 1}"), "a_1_b_1"),
          IndexEntry(fromjson("{a: 1, c: 1}"), "a_1_c_1")},
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{nosuchfield: 1}")}),
-        {},
-        {});
+        stdx::unordered_set<std::string>{},
+        stdx::unordered_set<std::string>{});
 }
 
 // This test case shows how to force query execution to use
@@ -147,7 +147,7 @@ TEST(GetExecutorTest, GetAllowedIndicesDescendingOrder) {
     testAllowedIndices(
         {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: -1}"), "a_-1")},
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: -1}")}),
-        {},
+        stdx::unordered_set<std::string>{},
         {"a_-1"});
 }
 
@@ -165,7 +165,7 @@ TEST(GetExecutorTest, GetAllowedIndicesMatchesMultipleIndexesByKey) {
     testAllowedIndices(
         {IndexEntry(fromjson("{a: 1}"), "a_1"), IndexEntry(fromjson("{a: 1}"), "a_1:en")},
         SimpleBSONObjComparator::kInstance.makeBSONObjSet({fromjson("{a: 1}")}),
-        {},
+        stdx::unordered_set<std::string>{},
         {"a_1", "a_1:en"});
 }
 

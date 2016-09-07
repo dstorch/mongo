@@ -151,7 +151,7 @@ void ServiceEntryPointTestSuite::MockTLHarness::asyncWait(Ticket&& ticket,
 
 SSLPeerInfo ServiceEntryPointTestSuite::MockTLHarness::getX509PeerInfo(
     const Session& session) const {
-    return SSLPeerInfo("mock", {});
+    return SSLPeerInfo("mock", stdx::unordered_set<RoleName>{});
 }
 
 void ServiceEntryPointTestSuite::MockTLHarness::registerTags(const Session& session) {}

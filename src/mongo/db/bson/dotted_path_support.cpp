@@ -166,7 +166,7 @@ BSONElement extractElementAtPathOrArrayAlongPath(const BSONObj& obj, const char*
 
 void extractAllElementsAlongPath(const BSONObj& obj,
                                  StringData path,
-                                 BSONElementSet& elements,
+                                 BSONEltSet& elements,
                                  bool expandArrayOnTrailingField,
                                  std::set<size_t>* arrayComponents) {
     const size_t initialDepth = 0;

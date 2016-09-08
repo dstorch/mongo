@@ -30,9 +30,10 @@
 
 #pragma once
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -41,8 +42,6 @@ class RE;
 }  // namespace pcrecpp;
 
 namespace mongo {
-
-class CollatorInterface;
 
 /**
  * This file contains leaves in the parse tree that are not array-based.
@@ -328,7 +327,10 @@ public:
  */
 class InMatchExpression : public LeafMatchExpression {
 public:
-    InMatchExpression() : LeafMatchExpression(MATCH_IN) {}
+    InMatchExpression()
+        : LeafMatchExpression(MATCH_IN),
+          _eltComparator(BSONElementComparator::FieldNamesMode::kIgnore, _collator),
+          _equalitySet(_eltComparator.makeBSONEltSet()) {}
 
     Status init(StringData path);
 
@@ -351,7 +353,7 @@ public:
 
     Status addRegex(std::unique_ptr<RegexMatchExpression> expr);
 
-    const BSONElementSet& getEqualities() const {
+    const BSONEltSet& getEqualities() const {
         return _equalitySet;
     }
 
@@ -372,18 +374,20 @@ public:
     }
 
 private:
+    // Collator used to compare elements. By default, simple binary comparison will be used.
+    const CollatorInterface* _collator = nullptr;
+
+    BSONElementComparator _eltComparator;
+
     // Whether or not '_equalities' has a jstNULL element in it.
     bool _hasNull = false;
 
     // Whether or not '_equalities' has an empty array element in it.
     bool _hasEmptyArray = false;
 
-    // Collator used to compare elements. By default, simple binary comparison will be used.
-    const CollatorInterface* _collator = nullptr;
-
     // Set of equality elements associated with this expression. '_collator' is used as a comparator
     // for this set.
-    BSONElementSet _equalitySet;
+    BSONEltSet _equalitySet;
 
     // Original container of equality elements, including duplicates. Needed for re-computing
     // '_equalitySet' in case '_collator' changes after elements have been added.

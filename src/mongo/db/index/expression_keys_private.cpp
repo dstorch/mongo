@@ -32,6 +32,7 @@
 
 #include <utility>
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/field_ref.h"
@@ -126,11 +127,11 @@ Status S2GetKeysForElement(const BSONElement& element,
  * returns false otherwise.
  */
 bool getS2GeoKeys(const BSONObj& document,
-                  const BSONElementSet& elements,
+                  const BSONEltSet& elements,
                   const S2IndexingParams& params,
                   BSONObjSet* out) {
     bool everGeneratedMultipleCells = false;
-    for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
+    for (auto i = elements.begin(); i != elements.end(); ++i) {
         vector<S2CellId> cells;
         Status status = S2GetKeysForElement(*i, params, &cells);
         uassert(16755,
@@ -215,7 +216,7 @@ bool getS2OneLiteralKey(const BSONElement& elt,
  * Returns true if any element of 'elements' is an array value that contains more than one element,
  * and returns false otherwise.
  */
-bool getS2LiteralKeys(const BSONElementSet& elements,
+bool getS2LiteralKeys(const BSONEltSet& elements,
                       const CollatorInterface* collator,
                       BSONObjSet* out) {
     bool indexedArrayValueWithMultipleElements = false;
@@ -225,7 +226,7 @@ bool getS2LiteralKeys(const BSONElementSet& elements,
         b.appendNull("");
         out->insert(b.obj());
     } else {
-        for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
+        for (auto i = elements.begin(); i != elements.end(); ++i) {
             const bool thisElemIsArrayWithMultipleElements = getS2OneLiteralKey(*i, collator, out);
             indexedArrayValueWithMultipleElements =
                 indexedArrayValueWithMultipleElements || thisElemIsArrayWithMultipleElements;
@@ -319,7 +320,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                  i != params.other.end();
                  ++i) {
                 // Get *all* fields for the index key
-                BSONElementSet eSet;
+                BSONEltSet eSet = SimpleBSONElementComparator::kInstance.makeBSONEltSet();
                 dps::extractAllElementsAlongPath(obj, i->first, eSet);
 
                 if (eSet.size() == 0)
@@ -330,7 +331,7 @@ void ExpressionKeysPrivate::get2DKeys(const BSONObj& obj,
                     // If we have more than one key, store as an array of the objects
                     BSONArrayBuilder aBuilder;
 
-                    for (BSONElementSet::iterator ei = eSet.begin(); ei != eSet.end(); ++ei) {
+                    for (auto ei = eSet.begin(); ei != eSet.end(); ++ei) {
                         aBuilder.append(*ei);
                     }
 
@@ -419,7 +420,7 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
 
     verify(otherFields.size() == 1);
 
-    BSONElementSet all;
+    BSONEltSet all = SimpleBSONElementComparator::kInstance.makeBSONEltSet();
 
     // The object we're indexing may be an array.
     dps::extractAllElementsAlongPath(obj, otherFields[0], all);
@@ -434,7 +435,7 @@ void ExpressionKeysPrivate::getHaystackKeys(const BSONObj& obj,
         // all.size()==1.  We can query on the complete field.
         // Ex: If our secondary field is type: ["A", "B"] all.size()==2 and all has values
         // "A" and "B".  The query looks for any of the fields in the array.
-        for (BSONElementSet::iterator i = all.begin(); i != all.end(); ++i) {
+        for (auto i = all.begin(); i != all.end(); ++i) {
             addKey(root, *i, keys);
         }
     }
@@ -477,7 +478,7 @@ void ExpressionKeysPrivate::getS2Keys(const BSONObj& obj,
     for (const auto keyElem : keyPattern) {
         // First, we get the keys that this field adds.  Either they're added literally from
         // the value of the field, or they're transformed if the field is geo.
-        BSONElementSet fieldElements;
+        BSONEltSet fieldElements = SimpleBSONElementComparator::kInstance.makeBSONEltSet();
         const bool expandArrayOnTrailingField = false;
         std::set<size_t>* arrayComponents = multikeyPaths ? &(*multikeyPaths)[posInIdx] : nullptr;
         dps::extractAllElementsAlongPath(

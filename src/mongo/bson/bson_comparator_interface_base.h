@@ -48,8 +48,6 @@ class BSONObj;
  */
 template <typename T>
 class BSONComparatorInterfaceBase {
-    MONGO_DISALLOW_COPYING(BSONComparatorInterfaceBase);
-
 public:
     /**
      * A deferred comparison between two objects of type T, which can be converted into a boolean

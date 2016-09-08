@@ -645,11 +645,12 @@ bool InMatchExpression::equivalent(const MatchExpression* other) const {
 
 void InMatchExpression::_doSetCollator(const CollatorInterface* collator) {
     _collator = collator;
+    _eltComparator =
+        BSONElementComparator(BSONElementComparator::FieldNamesMode::kIgnore, _collator);
 
     // We need to re-compute '_equalitySet', since our set comparator has changed.
-    BSONElementSet equalitiesWithNewComparator(
-        _originalEqualityVector.begin(), _originalEqualityVector.end(), collator);
-    _equalitySet = std::move(equalitiesWithNewComparator);
+    _equalitySet = _eltComparator.makeBSONEltSet();
+    _equalitySet.insert(_originalEqualityVector.begin(), _originalEqualityVector.end());
 }
 
 Status InMatchExpression::addEquality(const BSONElement& elt) {

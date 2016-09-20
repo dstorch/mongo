@@ -48,5 +48,28 @@
     var secondaryColl = secondary.getDB("test").initial_sync_decimal;
     assert.eq(1, secondaryColl.find({b: NumberDecimal(1)}).itcount());
 
+    // Step down the primary and wait for the old secondary to become the new primary.
+    assert.throws(function() {
+        var stepDownResult = primaryDB.adminCommand({replSetStepDown: 5 * 60});
+        print("replSetStepDown did not throw exception but returned: " + tojson(stepDownResult));
+    });
+    replTest.waitForState(secondary, ReplSetTest.State.PRIMARY, 5 * 60 * 1000);
+
+    primary = replTest.getPrimary();
+    primaryDB = primary.getDB("test");
+    primaryColl = primaryDB.initial_sync_decimal;
+
+    secondary = replTest.getSecondary();
+
+    // After changing roles, the new primary should reject decimal data.
+    assert.writeError(primaryColl.insert({a: 1, b: NumberDecimal(1)}));
+
+    // After changing roles, the new secondary should be able to initial sync decimal data.
+    assert.commandWorked(secondary.getDB("admin").runCommand({resync: 1}));
+    replTest.awaitSecondaryNodes();
+
+    var secondaryColl = secondary.getDB("test").initial_sync_decimal;
+    assert.eq(1, secondaryColl.find({b: NumberDecimal(1)}).itcount());
+
     replTest.stopSet();
 })();

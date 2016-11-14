@@ -8,7 +8,7 @@ function setupTest() {
             rs: true,
             numReplicas: 2,
             chunkSize: 1,
-            rsOptions: {oplogSize: 50},
+            rsOptions: {oplogSize: 50, setParameter: {heapProfilingEnabled: true}},
             enableBalancer: true
         }
     });
@@ -234,5 +234,3 @@ if (s.getDB("admin").runCommand("buildInfo").bits < 64) {
 } else {
     runTest(s);
 }
-
-s.stop();

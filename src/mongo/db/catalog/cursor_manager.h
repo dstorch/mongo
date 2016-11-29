@@ -49,6 +49,12 @@ class PlanExecutor;
  * ClientCursors. It is also responsible for allocating the cursor ids that are passed back to
  * clients.
  *
+ * In addition to managing the lifetime of ClientCursors, the CursorManager is responsible for
+ * notifying yielded queries of write operations and collection drops. For this reason, query
+ * PlanExecutor objects which are not contained within a ClientCursor are also registered with the
+ * CursorManager. Query executors must be registered with the CursorManager, either as a bare
+ * PlanExecutor or inside a ClientCursor (but cannot be registered in both ways).
+ *
  * There is a CursorManager per-collection and a global CursorManager. The global CursorManager owns
  * cursors whose lifetime is not tied to that of the collection and which do not need to receive
  * notifications about writes for a particular collection. In contrast, cursors owned by a
@@ -62,12 +68,6 @@ class PlanExecutor;
  *
  * The CursorManager is internally synchronized; operations on a given collection may call methods
  * concurrently on that collection's CursorManager.
- *
- * In addition to managing the lifetime of ClientCursors, the CursorManager is responsible for
- * notifying yielded queries of write operations and collection drops. For this reason, query
- * PlanExecutor objects which are not contained within a ClientCursor are also registered with the
- * CursorManager. Query executors must be registered with the CursorManager, either as a bare
- * PlanExecutor or inside a ClientCursor (but cannot be registered in both ways).
  *
  * See clientcursor.h for more information.
  */
@@ -188,7 +188,8 @@ private:
 
     CursorId _allocateCursorId_inlock();
     void _deregisterCursor_inlock(ClientCursor* cc);
-    ClientCursorPin _registerCursor_inlock(std::unique_ptr<ClientCursor> clientCursor);
+    ClientCursorPin _registerCursor_inlock(
+        std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
 
     void deregisterCursor(ClientCursor* cc);
 

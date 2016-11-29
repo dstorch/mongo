@@ -513,13 +513,13 @@ public:
 
             if (collection) {
                 const bool isAggCursor = true;  // enable special locking behavior
-                pin = collection->getCursorManager()->registerCursor(
+                pin.emplace(collection->getCursorManager()->registerCursor(
                     {exec.release(),
                      nss.ns(),
                      txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
                      0,
                      cmdObj.getOwned(),
-                     isAggCursor});
+                     isAggCursor}));
                 // Don't add any code between here and the start of the try block.
             }
 

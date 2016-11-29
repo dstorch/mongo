@@ -50,7 +50,7 @@ public:
         // Empty collections don't have any data we need to preserve
         if (collection) {
             // Pin keeps the CC from being deleted while it's in scope.  We delete it ourselves.
-            _pin = collection->getCursorManager()->registerRangePreserverCursor(collection);
+            _pin.emplace(collection->getCursorManager()->registerRangePreserverCursor(collection));
         }
     }
 

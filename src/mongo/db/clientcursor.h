@@ -305,9 +305,13 @@ private:
 };
 
 /**
- * ClientCursorPin is an RAII class which must be used in order to access a cursor. A pin is
- * obtained using the CursorManager. See cursor_manager.h for more details. ClientCursorPin
- * objects pin the given cursor upon construction, and release the pin upon destruction.
+ * ClientCursorPin is an RAII class which must be used in order to access a cursor. On construction,
+ * the ClientCursorPin marks its cursor as in use, which is called "pinning" the cursor. On
+ * destructrution, the ClientCursorPin marks its cursor as no longer in use, which is called
+ * "unpinning" the cursor. Pinning is used to prevent multiple concurrent uses of the same cursor---
+ * pinned cursors cannot be killed or timed out and cannot be used concurrently by other operations
+ * such as getMore or killCursors. A pin is obtained using the CursorManager. See cursor_manager.h
+ * for more details.
  *
  * A pin extends the lifetime of a ClientCursor object until the pin's release.  Pinned
  * ClientCursor objects cannot not be killed due to inactivity, and cannot be killed by user

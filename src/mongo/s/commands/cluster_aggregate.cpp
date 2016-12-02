@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -253,7 +254,7 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
     // Run merging command on random shard, unless a stage needs the primary shard. Need to use
     // ShardConnection so that the merging mongod is sent the config servers on connection init.
     auto& prng = txn->getClient()->getPrng();
-    const auto& mergingShardId = needPrimaryShardMerger
+    const auto& mergingShardId = (needPrimaryShardMerger || internalQueryAlwaysMergeOnPrimaryShard)
         ? conf->getPrimaryId()
         : shardResults[prng.nextInt32(shardResults.size())].shardTargetId;
     const auto mergingShard = uassertStatusOK(grid.shardRegistry()->getShard(txn, mergingShardId));

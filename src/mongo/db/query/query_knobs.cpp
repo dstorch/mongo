@@ -72,4 +72,6 @@ MONGO_EXPORT_SERVER_PARAMETER(internalInsertMaxBatchSize,
                               int,
                               internalQueryExecYieldIterations / 2);
 
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryAlwaysMergeOnPrimaryShard, bool, false);
+
 }  // namespace mongo

@@ -113,4 +113,9 @@ extern std::atomic<int> internalQueryFacetBufferSizeBytes;  // NOLINT
 
 extern std::atomic<int> internalInsertMaxBatchSize;  // NOLINT
 
+// If set to true on mongos, all aggregations delivered to the mongos which require a merging shard
+// will select the primary shard as the merger. False by default, which means that the merging shard
+// will be selected randomly amongst the shards participating in the query.
+extern std::atomic<bool> internalQueryAlwaysMergeOnPrimaryShard;  // NOLINT
+
 }  // namespace mongo

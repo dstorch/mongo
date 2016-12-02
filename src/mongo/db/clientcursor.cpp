@@ -102,7 +102,7 @@ ClientCursor::ClientCursor(const Collection* collection,
 }
 
 void ClientCursor::init() {
-    invariant(!_cursorManager);
+    invariant(_cursorManager);
 
     cursorStatsOpen.increment();
 

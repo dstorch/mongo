@@ -336,6 +336,19 @@ const StringMap<BSONObj::MatchType> queryOperatorMap{
     {"bitsAnyClear", BSONObj::opBITS_ANY_CLEAR},
 };
 
+// Compares two string elements using a simple binary compare.
+int compareElementStringValues(const BSONElement& leftStr, const BSONElement& rightStr) {
+    // we use memcmp as we allow zeros in UTF8 strings
+    int lsz = leftStr.valuestrsize();
+    int rsz = rightStr.valuestrsize();
+    int common = std::min(lsz, rsz);
+    int res = memcmp(leftStr.valuestr(), rightStr.valuestr(), common);
+    if (res)
+        return res;
+    // longer std::string is the greater one
+    return lsz - rsz;
+}
+
 }  // namespace
 
 int BSONElement::getGtLtOp(int def) const {
@@ -944,19 +957,12 @@ int compareElementValues(const BSONElement& l,
             return memcmp(l.value(), r.value(), OID::kOIDSize);
         case Code:
         case Symbol:
+            return compareElementStringValues(l, r);
         case String: {
-            if (comparator) {
+            if (comparator && l.type() == BSONType::String) {
                 return comparator->compare(l.valueStringData(), r.valueStringData());
             } else {
-                // we use memcmp as we allow zeros in UTF8 strings
-                int lsz = l.valuestrsize();
-                int rsz = r.valuestrsize();
-                int common = std::min(lsz, rsz);
-                int res = memcmp(l.valuestr(), r.valuestr(), common);
-                if (res)
-                    return res;
-                // longer std::string is the greater one
-                return lsz - rsz;
+                return compareElementStringValues(l, r);
             }
         }
         case Object:

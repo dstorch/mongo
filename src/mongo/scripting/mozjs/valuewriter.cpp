@@ -59,6 +59,8 @@ int ValueWriter::type() {
         return Undefined;
     if (_value.isString())
         return String;
+    if (_value.isSymbol())
+        return Symbol;
 
     bool isArray;
 
@@ -104,6 +106,8 @@ std::string ValueWriter::typeAsString() {
         return "undefined";
     if (_value.isString())
         return "string";
+    if (_value.isSymbol())
+        return "symbol";
 
     bool isArray;
 
@@ -247,6 +251,9 @@ void ValueWriter::writeThis(BSONObjBuilder* b,
     if (_value.isString()) {
         JSStringWrapper jsstr;
         b->append(sd, toStringData(&jsstr));
+    } else if (_value.isSymbol()) {
+        JSStringWrapper jsstr;
+        b->appendSymbol(sd, toStringData(&jsstr));
     } else if (_value.isNumber()) {
         double val = toNumber();
 

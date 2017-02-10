@@ -61,8 +61,10 @@ const long long AggregationRequest::kDefaultBatchSize = 101;
 AggregationRequest::AggregationRequest(NamespaceString nss, std::vector<BSONObj> pipeline)
     : _nss(std::move(nss)), _pipeline(std::move(pipeline)), _batchSize(kDefaultBatchSize) {}
 
-StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString nss,
-                                                                 const BSONObj& cmdObj) {
+StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
+    NamespaceString nss,
+    const BSONObj& cmdObj,
+    boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
     // Parse required parameters.
     auto pipelineElem = cmdObj[kPipelineName];
     if (pipelineElem.eoo() || pipelineElem.type() != BSONType::Array) {
@@ -87,6 +89,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
         repl::ReadConcernArgs::kReadConcernFieldName};
 
     bool hasCursorElem = false;
+    bool hasExplainElem = false;
 
     // Parse optional parameters.
     for (auto&& elem : cmdObj) {
@@ -138,7 +141,11 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
                         str::stream() << kExplainName << " must be a boolean, not a "
                                       << typeName(elem.type())};
             }
-            request.setExplain(elem.Bool());
+
+            hasExplainElem = true;
+            if (elem.Bool()) {
+                request.setExplain(ExplainOptions::Verbosity::kQueryPlanner);
+            }
         } else if (kFromRouterName == fieldName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
@@ -165,11 +172,28 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
         }
     }
 
-    if (!hasCursorElem && !request.isExplain()) {
+    if (explainVerbosity) {
+        if (hasExplainElem) {
+            return {
+                ErrorCodes::FailedToParse,
+                str::stream() << "The '" << kExplainName
+                              << "' option is illegal when a explain verbosity is also provided"};
+        }
+
+        request.setExplain(explainVerbosity);
+    }
+
+    if (!hasCursorElem && !request.getExplain()) {
         return {ErrorCodes::FailedToParse,
-                str::stream() << "The '" << kCursorName << "' option is required, unless '"
-                              << kExplainName
-                              << "' is true"};
+                str::stream() << "The '" << kCursorName
+                              << "' option is required, except for aggregation explain"};
+    }
+
+    if (request.getExplain() && cmdObj[repl::ReadConcernArgs::kReadConcernFieldName]) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Aggregation explain does not support the '"
+                              << repl::ReadConcernArgs::kReadConcernFieldName
+                              << "' option"};
     }
 
     return request;
@@ -181,7 +205,6 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kCommandName, _nss.coll()},
         {kPipelineName, _pipeline},
         // Only serialize booleans if different than their default.
-        {kExplainName, _explain ? Value(true) : Value()},
         {kAllowDiskUseName, _allowDiskUse ? Value(true) : Value()},
         {kFromRouterName, _fromRouter ? Value(true) : Value()},
         {bypassDocumentValidationCommandOption(),
@@ -189,7 +212,7 @@ Document AggregationRequest::serializeToCommandObj() const {
         // Only serialize a collation if one was specified.
         {kCollationName, _collation.isEmpty() ? Value() : Value(_collation)},
         // Only serialize batchSize when explain is false.
-        {kCursorName, _explain ? Value() : Value(Document{{kBatchSizeName, _batchSize}})},
+        {kCursorName, _explainMode ? Value() : Value(Document{{kBatchSizeName, _batchSize}})},
         // Only serialize a hint if one was specified.
         {kHintName, _hint.isEmpty() ? Value() : Value(_hint)}};
 }

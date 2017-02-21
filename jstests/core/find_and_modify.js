@@ -116,6 +116,18 @@ cmdRes = db.runCommand({
 });
 assert.commandFailed(cmdRes);
 
+t.drop();
+
+// Upsert resulting in an insert succeeds with single-element $in and matching $addToSet.
+cmdRes = db.runCommand({
+    findAndModify: t.getName(),
+    query: {x: {$in: [3]}},
+    update: {$addToSet: {x: 3}},
+    upsert: true
+});
+assert.commandWorked(cmdRes);
+assert.neq(null, t.findOne({x: 3}));
+
 //
 // SERVER-17372
 //

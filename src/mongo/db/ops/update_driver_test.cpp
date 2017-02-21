@@ -428,4 +428,10 @@ TEST_F(CreateFromQuery, NotFullShardKeyRepl) {
         txn(), query, &immutablePaths.vector(), doc()));
 }
 
+TEST_F(CreateFromQuery, SingleElementInNotUsedToPopulateDoc) {
+    BSONObj query = fromjson("{a: 1, b: {$in: [2]}, c: {$in: [3, 4]}, d: {$eq: 5}}");
+    ASSERT_OK(driverOps().populateDocumentWithQueryFields(txn(), query, nullptr, doc()));
+    assertSameFields(fromjson("{a: 1, d: 5}"), doc().getObject());
+}
+
 }  // unnamed namespace

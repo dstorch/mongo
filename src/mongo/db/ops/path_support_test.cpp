@@ -47,6 +47,11 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/query_request.h"
+#include "mongo/db/query/query_test_service_context.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -649,6 +654,23 @@ TEST(ExtractEqualities, IdOnly) {
     ASSERT_OK(extractEqualityMatches(*expr, &equalities));
     ASSERT_EQUALS(equalities.size(), 1u);
     assertContains(equalities, "_id", 1);
+}
+
+TEST(ExtractEqualities, ExtractEqualityRewrittenFromSingleElementIn) {
+    QueryTestServiceContext serviceContext;
+    auto txn = serviceContext.makeOperationContext();
+
+    auto queryRequest =
+        stdx::make_unique<QueryRequest>(NamespaceString("testDB"_sd, "testColl"_sd));
+    queryRequest->setFilter(fromjson("{a: {$in: [2]}, b: {$in: [3, 4]}, c: 5}"));
+    auto cq = unittest::assertGet(CanonicalQuery::canonicalize(
+        txn.get(), std::move(queryRequest), ExtensionsCallbackDisallowExtensions()));
+
+    EqualityMatches equalities;
+    ASSERT_OK(extractEqualityMatches(*cq->root(), &equalities));
+    ASSERT_EQUALS(equalities.size(), 2u);
+    assertContains(equalities, "a", 2);
+    assertContains(equalities, "c", 5);
 }
 
 /**

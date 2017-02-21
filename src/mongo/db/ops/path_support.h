@@ -174,15 +174,6 @@ BSONElement findParentEqualityElement(const EqualityMatches& equalities,
                                       const FieldRef& path,
                                       int* parentPathParts);
 
-/**
- * Adds the BSON values from equality matches into the given document at the equality match
- * paths.
- *
- * Returns PathNotViable similar to setElementAtPath above.  If equality paths do not
- * conflict, as is enforced by extractEqualityMatches, this function should return OK.
- */
-Status addEqualitiesToDoc(const EqualityMatches& equalities, mutablebson::Document* doc);
-
 }  // namespace pathsupport
 
 }  // namespace mongo

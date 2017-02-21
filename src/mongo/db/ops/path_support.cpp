@@ -410,18 +410,5 @@ Status extractEqualityMatches(const MatchExpression& root, EqualityMatches* equa
     return _extractFullEqualityMatches(root, NULL, equalities);
 }
 
-Status addEqualitiesToDoc(const EqualityMatches& equalities, mutablebson::Document* doc) {
-    for (EqualityMatches::const_iterator it = equalities.begin(); it != equalities.end(); ++it) {
-        FieldRef path(it->first);
-        const BSONElement& data = it->second->getData();
-
-        Status status = setElementAtPath(path, data, doc);
-        if (!status.isOK())
-            return status;
-    }
-
-    return Status::OK();
-}
-
 }  // namespace pathsupport
 }  // namespace mongo

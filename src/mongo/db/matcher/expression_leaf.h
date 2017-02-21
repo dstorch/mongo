@@ -145,7 +145,26 @@ protected:
 
 class EqualityMatchExpression : public ComparisonMatchExpression {
 public:
-    EqualityMatchExpression() : ComparisonMatchExpression(EQ) {}
+    /**
+     * Describes how this predicate should behave for upserts.
+     *
+     * Top-level equality match expressions are used to seed the fields of the document which will
+     * be inserted when no matching documents are found. However, not all equality match expressions
+     * are relevant to the upsert path. For example, equality predicates created by the planner's
+     * internal rewrites should not seed the doc to be inserted).
+     */
+    enum class UpsertMode {
+        // This equality match expression should be converted into a field of the document to
+        // insert.
+        kSeed,
+
+        // This equality match expression has no effect for upserts.
+        kIgnore,
+    };
+
+    EqualityMatchExpression(UpsertMode upsertMode = UpsertMode::kSeed)
+        : ComparisonMatchExpression(EQ), _upsertMode(upsertMode) {}
+
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e = stdx::make_unique<EqualityMatchExpression>();
         e->init(path(), _rhs);
@@ -155,6 +174,13 @@ public:
         e->setCollator(_collator);
         return std::move(e);
     }
+
+    UpsertMode getUpsertMode() const {
+        return _upsertMode;
+    }
+
+private:
+    UpsertMode _upsertMode;
 };
 
 class LTEMatchExpression : public ComparisonMatchExpression {

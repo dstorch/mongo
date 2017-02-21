@@ -53,6 +53,30 @@ using std::vector;
 
 using pathsupport::EqualityMatches;
 
+namespace {
+/**
+ * Adds the BSON values from equality matches into the given document at the equality match paths.
+ *
+ * Skips equality matches that are tagged to be ignored for upsert.
+ */
+Status addEqualitiesToDoc(const EqualityMatches& equalities, mutablebson::Document* doc) {
+    for (EqualityMatches::const_iterator it = equalities.begin(); it != equalities.end(); ++it) {
+        if (it->second->getUpsertMode() == EqualityMatchExpression::UpsertMode::kIgnore) {
+            continue;
+        }
+
+        FieldRef path(it->first);
+        const BSONElement& data = it->second->getData();
+
+        Status status = pathsupport::setElementAtPath(path, data, doc);
+        if (!status.isOK())
+            return status;
+    }
+
+    return Status::OK();
+}
+}  // namespace
+
 UpdateDriver::UpdateDriver(const Options& opts)
     : _replacementMode(false),
       _indexedFields(NULL),
@@ -220,7 +244,7 @@ Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery& query
     if (!status.isOK())
         return status;
 
-    status = pathsupport::addEqualitiesToDoc(equalities, &doc);
+    status = addEqualitiesToDoc(equalities, &doc);
     return status;
 }
 

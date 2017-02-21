@@ -30,6 +30,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
@@ -531,6 +532,22 @@ TEST(CanonicalQueryTest, NormalizeWithInPreservesTags) {
     IndexTag* tag = dynamic_cast<IndexTag*>(matchExpression->getTag());
     ASSERT(tag);
     ASSERT_EQ(2U, tag->index);
+}
+
+TEST(CanonicalQueryTest, NormalizeWithInResultsInExpressionToIgnoreForUpsert) {
+    BSONObj obj = fromjson("{x: {$in: [1]}}");
+    unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    matchExpression.reset(CanonicalQuery::normalizeTree(matchExpression.release()));
+    auto equalityExpr = static_cast<const EqualityMatchExpression*>(matchExpression.get());
+    ASSERT(EqualityMatchExpression::UpsertMode::kIgnore == equalityExpr->getUpsertMode());
+}
+
+TEST(CanonicalQueryTest, EqualityMatchExpressionShouldSeedUpsertAfterNormalization) {
+    BSONObj obj = fromjson("{x: 1}");
+    unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    matchExpression.reset(CanonicalQuery::normalizeTree(matchExpression.release()));
+    auto equalityExpr = static_cast<const EqualityMatchExpression*>(matchExpression.get());
+    ASSERT(EqualityMatchExpression::UpsertMode::kSeed == equalityExpr->getUpsertMode());
 }
 
 TEST(CanonicalQueryTest, NormalizeWithInAndRegexPreservesTags) {

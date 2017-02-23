@@ -151,7 +151,7 @@ public:
      * Top-level equality match expressions are used to seed the fields of the document which will
      * be inserted when no matching documents are found. However, not all equality match expressions
      * are relevant to the upsert path. For example, equality predicates created by the planner's
-     * internal rewrites should not seed the doc to be inserted).
+     * internal rewrites should not seed the doc to be inserted.
      */
     enum class UpsertMode {
         // This equality match expression should be converted into a field of the document to

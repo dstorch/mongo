@@ -60,13 +60,13 @@ namespace {
  * Skips equality matches that are tagged to be ignored for upsert.
  */
 Status addEqualitiesToDoc(const EqualityMatches& equalities, mutablebson::Document* doc) {
-    for (EqualityMatches::const_iterator it = equalities.begin(); it != equalities.end(); ++it) {
-        if (it->second->getUpsertMode() == EqualityMatchExpression::UpsertMode::kIgnore) {
+    for (auto&& it : equalities) {
+        if (it.second->getUpsertMode() == EqualityMatchExpression::UpsertMode::kIgnore) {
             continue;
         }
 
-        FieldRef path(it->first);
-        const BSONElement& data = it->second->getData();
+        FieldRef path(it.first);
+        const BSONElement& data = it.second->getData();
 
         Status status = pathsupport::setElementAtPath(path, data, doc);
         if (!status.isOK())

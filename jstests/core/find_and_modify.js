@@ -121,7 +121,7 @@ t.drop();
 // Upsert resulting in an insert succeeds with single-element $in and matching $addToSet.
 cmdRes = db.runCommand({
     findAndModify: t.getName(),
-    query: {x: {$in: [3]}},
+    query: {x: {$in: [2]}},
     update: {$addToSet: {x: 3}},
     upsert: true
 });

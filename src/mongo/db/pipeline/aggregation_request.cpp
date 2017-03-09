@@ -43,6 +43,7 @@
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 
@@ -83,7 +84,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
 
     const std::initializer_list<StringData> optionsParsedElseWhere = {
         QueryRequest::cmdOptionMaxTimeMS,
-        "writeConcern"_sd,
+        WriteConcernOptions::kWriteConcernField,
         kPipelineName,
         kCommandName,
         repl::ReadConcernArgs::kReadConcernFieldName};
@@ -193,6 +194,13 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
         return {ErrorCodes::FailedToParse,
                 str::stream() << "Aggregation explain does not support the '"
                               << repl::ReadConcernArgs::kReadConcernFieldName
+                              << "' option"};
+    }
+
+    if (request.getExplain() && cmdObj[WriteConcernOptions::kWriteConcernField]) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Aggregation explain does not support the'"
+                              << WriteConcernOptions::kWriteConcernField
                               << "' option"};
     }
 

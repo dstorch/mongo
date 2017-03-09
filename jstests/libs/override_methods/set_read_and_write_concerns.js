@@ -127,10 +127,12 @@
             const hasOut =
                 lastStage && (typeof lastStage === 'object') && lastStage.hasOwnProperty('$out');
             const hasExplain = obj.hasOwnProperty("explain");
-            if (hasOut) {
-                forceWriteConcern = true;
-            } else if (!hasExplain) {
-                forceReadConcern = true;
+            if (!hasExplain) {
+                if (hasOut) {
+                    forceWriteConcern = true;
+                } else {
+                    forceReadConcern = true;
+                }
             }
         }
 

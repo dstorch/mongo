@@ -306,6 +306,21 @@ TEST(AggregationRequestTest, ShouldRejectExplainExecStatsVerbosityWithReadConcer
             .getStatus());
 }
 
+TEST(AggregationRequestTest, ShouldRejectExplainWithWriteConcernMajority) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [], explain: true, writeConcern: {w: 'majority'}}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectExplainExecStatsVerbosityWithWriteConcernMajority) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson = fromjson("{pipeline: [], writeConcern: {w: 'majority'}}");
+    ASSERT_NOT_OK(
+        AggregationRequest::parseFromBSON(nss, inputBson, ExplainOptions::Verbosity::kExecStats)
+            .getStatus());
+}
+
 //
 // Ignore fields parsed elsewhere.
 //

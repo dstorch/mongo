@@ -60,6 +60,8 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanOrChildrenIndependently, bool, tr
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryMaxScansToExplode, int, 200);
 
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryTempUseNewDepsTracking, bool, false);
+
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecMaxBlockingSortBytes, int, 32 * 1024 * 1024);
 
 // Yield every 128 cycles or 10ms.

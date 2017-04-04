@@ -200,7 +200,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
 
             // We've already allocated space for the trailing $match stage in '_fromPipeline'.
             _fromPipeline.back() = *matchStage;
-            auto pipeline = uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx));
+            auto pipeline =
+                uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx, nullptr));
             while (auto next = pipeline->getNext()) {
                 uassert(40271,
                         str::stream()

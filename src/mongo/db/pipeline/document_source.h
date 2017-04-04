@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
@@ -191,6 +192,37 @@ public:
 
         ReturnStatus _status;
         Document _result;
+    };
+
+    enum GetDepsReturn {
+        // The full object and all metadata may be required.
+        NOT_SUPPORTED = 0x0,
+
+        // Later stages could need either fields or metadata. For example, a $limit stage will pass
+        // through all fields, and they may or may not be needed by future stages.
+        SEE_NEXT = 0x1,
+
+        // Later stages won't need more fields from input. For example, an inclusion projection like
+        // {_id: 1, a: 1} will only output two fields, so future stages cannot possibly depend on
+        // any other fields.
+        EXHAUSTIVE_FIELDS = 0x2,
+
+        // Later stages won't need more metadata from input. For example, a $group stage will group
+        // documents together, discarding their text score.
+        EXHAUSTIVE_META = 0x4,
+
+        // Later stages won't need either fields or metadata.
+        EXHAUSTIVE_ALL = EXHAUSTIVE_FIELDS | EXHAUSTIVE_META,
+    };
+
+    /**
+     * TODO document.
+     */
+    struct DepsSupport {
+        bool fieldsKnownExhaustively = false;
+        bool metadataKnownExhaustively = false;
+        bool supportsTraceback = false;
+        bool alwaysAddDependencies = false;
     };
 
     virtual ~DocumentSource() {}
@@ -403,26 +435,18 @@ public:
         return false;
     }
 
-    enum GetDepsReturn {
-        // The full object and all metadata may be required.
-        NOT_SUPPORTED = 0x0,
-
-        // Later stages could need either fields or metadata. For example, a $limit stage will pass
-        // through all fields, and they may or may not be needed by future stages.
-        SEE_NEXT = 0x1,
-
-        // Later stages won't need more fields from input. For example, an inclusion projection like
-        // {_id: 1, a: 1} will only output two fields, so future stages cannot possibly depend on
-        // any other fields.
-        EXHAUSTIVE_FIELDS = 0x2,
-
-        // Later stages won't need more metadata from input. For example, a $group stage will group
-        // documents together, discarding their text score.
-        EXHAUSTIVE_META = 0x4,
-
-        // Later stages won't need either fields or metadata.
-        EXHAUSTIVE_ALL = EXHAUSTIVE_FIELDS | EXHAUSTIVE_META,
-    };
+    //
+    // Dependency tracking.
+    //
+    // Dependency tracking is a optimization which analyzes the pipeline in order to determine
+    // whether there is a known finite set of fields which are required from the collection. If
+    // there is such a set, then an inclusion projection containing only the fields needed to
+    // compute the pipeline is passed down to the query system. This enables covered query plans and
+    // saves significant work due to the reduced amount of data flowing through the pipeline.
+    //
+    // Document sources which wish to participate in dependency analysis must implement _all_ of the
+    // following virtual methods.
+    //
 
     /**
      * Get the dependencies this operation needs to do its job. If overridden, subclasses must add
@@ -434,6 +458,70 @@ public:
     virtual GetDepsReturn getDependencies(DepsTracker* deps) const {
         return NOT_SUPPORTED;
     }
+
+    /**
+     * Get the dependencies this operation needs to do its job. If overridden, subclasses must add
+     * all paths needed to apply their transformation to 'deps->fields', and call
+     * 'deps->setNeedTextScore()' if the text score is required.
+     *
+     * Returns boost::none if this stage does not support dependency tracking. Otherwise, returns a
+     * struct which indicates the dependency tracking functionality supported by this stage. See
+     * DepsSupport documentation for more details.
+     */
+    virtual boost::optional<DepsSupport> newGetDependencies(DepsTracker* deps) const {
+        return boost::none;
+    }
+
+    /**
+     * Fills out 'depsTracker' with the set of fields that are needed by the pipeline. If all fields
+     * are needed, sets DepsTracker::needWholeDocument to true. Also sets whether the text score
+     * must be requested from the underlying collection on 'depsTracker'.
+     *
+     * Calls doTrackDependencies() on each stage as a hook for any special behavior.
+     */
+    void trackDependencies(DepsTracker* depsTracker);
+
+    /**
+     * Performs any stage-specific dependency tracking behavior.
+     */
+    virtual void doTrackDependencies(DepsTracker* depsTracker) {}
+
+    /**
+     * Gets the set of fields required for this DocumentSource to compute the value which it stores
+     * in 'path'. For example, consider the stage
+     *
+     *  {$project: {newPath: {$sum: ["$oldPath1", "$oldPath2"]}}}
+     *
+     * Calling getDependenciesOfPath("newPath") on this stage should return the set {"oldPath1",
+     * "oldPath2"}.
+     */
+    virtual std::set<std::string> getDependenciesOfPath(const FieldPath& path) const {
+        return {};
+    }
+
+    /**
+     * Removes any expressions owned by this DocumentSource which store their result in a path _not_
+     * contained in 'currentDeps'. Such expressions do not need to be evaluated in order to compute
+     * the result set of this aggregation.
+     *
+     * Example:
+     *  [{$addFields: {allTrue: {$allElementsTrue: "$foo"}}}, {$project: {_id: 0, bar: 1}}]
+     *
+     * In this example, we compute "allTrue", which depends on "foo", but then project out all
+     * fields except for "bar". The dependency tracking system will notice that neither "allTrue" or
+     * "foo" need to be requested from the collection and will project them out. It will call
+     * stripExpressionsThatAreNotDependencies({"bar"}) on the addFields stage, which will in turn
+     * replace $allElementsTrue with a constant expression.
+     *
+     * Note that stripping unneeded expressions is not an optional optimization, but rather is
+     * required for correctness. If $allElementsTrue was not stripped in the example above, it would
+     * be evaluated over a document in which "foo" had been projected out. Since $allElementsTrue
+     * requires an array as input, this would have resulted in failure of the aggregation command.
+     *
+     * Implementations should typically "strip" expressions by replacing them with an
+     * ExpressionConstant with a Value of missing.
+     */
+    virtual void stripExpressionsThatAreNotDependencies(std::set<std::string> currentDeps) {}
 
 protected:
     /**
@@ -579,10 +667,13 @@ public:
          * for execution. The returned pipeline is optimized and has a cursor source prepared.
          *
          * This function returns a non-OK status if parsing the pipeline failed.
+         *
+         * TODO: document dependency tracker.
          */
         virtual StatusWith<boost::intrusive_ptr<Pipeline>> makePipeline(
             const std::vector<BSONObj>& rawPipeline,
-            const boost::intrusive_ptr<ExpressionContext>& expCtx) = 0;
+            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+            DepsTracker* depsTracker) = 0;
 
         // Add new methods as needed.
     };

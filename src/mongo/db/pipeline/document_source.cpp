@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -254,4 +255,72 @@ BSONObjSet DocumentSource::truncateSortSet(const BSONObjSet& sorts,
 
     return out;
 }
+
+void DocumentSource::trackDependencies(DepsTracker* depsTracker) {
+    // No matter what, the last thing we do is always to track the dependencies of our child.
+    ON_BLOCK_EXIT([this, depsTracker] {
+        if (pSource) {
+            pSource->trackDependencies(depsTracker);
+        }
+    });
+
+    doTrackDependencies(depsTracker);
+
+    DepsTracker localDeps;
+    auto depsSupport = newGetDependencies(&localDeps);
+    const bool currentStageExhaustive = depsSupport && depsSupport->fieldsKnownExhaustively;
+    if (!depsTracker->fieldsKnownExhaustively) {
+        if (currentStageExhaustive) {
+            // Found our first exhaustive stage. Seed the dependency set and tag the tracker with
+            // this knowledge.
+            invariant(depsTracker->fields.empty());
+            depsTracker->fields.insert(localDeps.fields.begin(), localDeps.fields.end());
+            depsTracker->fieldsKnownExhaustively = true;
+        } else {
+            // We haven't yet found any exhaustive stages, so there's no work to do, other than
+            // moving on to our child.
+        }
+
+        return;
+    }
+
+    // If dependency tracking is not supported, we'll need the whole document. We may find another
+    // exhaustive stage later, however, in which case dependency tracking will resume.
+    if (!depsSupport) {
+        depsTracker->needWholeDocument = true;
+        return;
+    }
+
+    if (currentStageExhaustive) {
+        // We found another exhaustive stage. A downstream stage may have thought that the whole
+        // document was needed, but this whole document is in fact exhaustively known due to this
+        // upstream stage.
+        depsTracker->needWholeDocument = false;
+    }
+
+    if (localDeps.needWholeDocument) {
+        depsTracker->needWholeDocument = true;
+    }
+
+    if (depsSupport->supportsTraceback) {
+        // This stage supports narrowing the dependency set by tracing back through the dependency
+        // graph.
+        std::set<std::string> currentDeps;
+        currentDeps.swap(depsTracker->fields);
+
+        if (!depsTracker->needWholeDocument) {
+            stripExpressionsThatAreNotDependencies(currentDeps);
+        }
+
+        for (auto&& path : currentDeps) {
+            auto depsOf = getDependenciesOfPath(FieldPath(path));
+            depsTracker->fields.insert(depsOf.begin(), depsOf.end());
+        }
+    }
+
+    if (depsSupport->alwaysAddDependencies) {
+        // This stage can have dependencies which need to be added unconditionally.
+        depsTracker->fields.insert(localDeps.fields.begin(), localDeps.fields.end());
+    }
 }
+}  // namespace mongo

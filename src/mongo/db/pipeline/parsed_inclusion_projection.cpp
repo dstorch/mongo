@@ -103,6 +103,49 @@ void InclusionNode::addDependencies(DepsTracker* deps) const {
     }
 }
 
+std::set<std::string> InclusionNode::getDependenciesOfPath(const FieldPath& path) const {
+    if (path.getPathLength() == 1) {
+        std::set<std::string> dependencies;
+        auto fieldName = path.fullPath();
+        if (_inclusions.find(fieldName) != _inclusions.end()) {
+            dependencies.insert(fieldName);
+        }
+
+        auto expr = _expressions.find(fieldName);
+        if (expr != _expressions.end()) {
+            DepsTracker localDeps;
+            expr->second->addDependencies(&localDeps);
+            dependencies.insert(localDeps.fields.begin(), localDeps.fields.end());
+        }
+
+        return dependencies;
+    }
+
+    auto child = getChild(path.getFieldName(0).toString());
+    if (!child) {
+        // The path doesn't exist in this inclusion node tree.
+        return {};
+    }
+
+    return child->getDependenciesOfPath(path.tail());
+}
+
+void InclusionNode::stripExpressionsThatAreNotDependencies(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, std::set<std::string> currentDeps) {
+    for (auto&& expr : _expressions) {
+        auto exprPath = FieldPath::getFullyQualifiedPath(_pathToNode, expr.first);
+        if (currentDeps.find(exprPath) == currentDeps.end()) {
+            // Found an expression which does not need to be computed. Strip it out by replacing it
+            // with a literal.
+            expr.second = ExpressionConstant::create(expCtx, Value());
+        }
+    }
+
+    for (auto&& child : _children) {
+        child.second->stripExpressionsThatAreNotDependencies(expCtx, currentDeps);
+    }
+}
+
 void InclusionNode::applyInclusions(Document inputDoc, MutableDocument* outputDoc) const {
     auto it = inputDoc.fieldIterator();
     while (it.more()) {

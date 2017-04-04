@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/dependencies.h"
 
 namespace mongo {
 class Collection;
@@ -74,10 +75,13 @@ public:
      * Callers must take care to ensure that 'collection' is locked in at least IS-mode.
      *
      * When not null, 'aggRequest' provides access to pipeline command options such as hint.
+     *
+     * TODO: Document depsTracker.
      */
     static void prepareCursorSource(Collection* collection,
                                     const AggregationRequest* aggRequest,
-                                    const boost::intrusive_ptr<Pipeline>& pipeline);
+                                    const boost::intrusive_ptr<Pipeline>& pipeline,
+                                    DepsTracker* depsTracker = nullptr);
 
     static std::string getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& pPipeline);
 

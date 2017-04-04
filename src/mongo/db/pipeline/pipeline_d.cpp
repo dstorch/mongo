@@ -180,7 +180,8 @@ public:
 
     StatusWith<boost::intrusive_ptr<Pipeline>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        DepsTracker* deps) final {
         // 'expCtx' may represent the settings for an aggregation pipeline on a different namespace
         // than the DocumentSource this MongodImplementation is injected into, but both
         // ExpressionContext instances should still have the same OperationContext.
@@ -205,7 +206,8 @@ public:
         auto css = CollectionShardingState::get(_ctx->opCtx, expCtx->ns);
         uassert(4567, "from collection cannot be sharded", !bool(css->getMetadata()));
 
-        PipelineD::prepareCursorSource(autoColl.getCollection(), nullptr, pipeline.getValue());
+        PipelineD::prepareCursorSource(
+            autoColl.getCollection(), nullptr, pipeline.getValue(), deps);
 
         return pipeline;
     }
@@ -338,7 +340,8 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
 
 void PipelineD::prepareCursorSource(Collection* collection,
                                     const AggregationRequest* aggRequest,
-                                    const intrusive_ptr<Pipeline>& pipeline) {
+                                    const intrusive_ptr<Pipeline>& pipeline,
+                                    DepsTracker* depsTracker) {
     auto expCtx = pipeline->getContext();
     dassert(expCtx->opCtx->lockState()->isCollectionLockedForMode(expCtx->ns.ns(), MODE_IS));
 
@@ -373,12 +376,13 @@ void PipelineD::prepareCursorSource(Collection* collection,
                 sources.emplace_front(DocumentSourceSampleFromRandomCursor::create(
                     expCtx, sampleSize, idString, numRecords));
 
-                addCursorSource(
-                    collection,
-                    pipeline,
-                    expCtx,
-                    std::move(exec),
-                    pipeline->getDependencies(DepsTracker::MetadataAvailable::kNoMetadata));
+                addCursorSource(collection,
+                                pipeline,
+                                expCtx,
+                                std::move(exec),
+                                depsTracker ? *depsTracker
+                                            : pipeline->getDependencies(
+                                                  DepsTracker::MetadataAvailable::kNoMetadata));
                 return;
             }
         }
@@ -400,9 +404,14 @@ void PipelineD::prepareCursorSource(Collection* collection,
     }
 
     // Find the set of fields in the source documents depended on by this pipeline.
-    DepsTracker deps = pipeline->getDependencies(DocumentSourceMatch::isTextQuery(queryObj)
-                                                     ? DepsTracker::MetadataAvailable::kTextScore
-                                                     : DepsTracker::MetadataAvailable::kNoMetadata);
+    DepsTracker deps;
+    if (!depsTracker) {
+        deps = pipeline->getDependencies(DocumentSourceMatch::isTextQuery(queryObj)
+                                             ? DepsTracker::MetadataAvailable::kTextScore
+                                             : DepsTracker::MetadataAvailable::kNoMetadata);
+    } else {
+        deps = *depsTracker;
+    }
 
     BSONObj projForQuery = deps.toProjection();
 
@@ -599,6 +608,8 @@ void PipelineD::addCursorSource(Collection* collection,
         pSource->setProjection(projectionObj, boost::none);
     } else {
         // There may be fewer dependencies now if the sort was covered.
+        //
+        // TODO uh oooooh.
         if (!sortObj.isEmpty()) {
             deps = pipeline->getDependencies(DocumentSourceMatch::isTextQuery(queryObj)
                                                  ? DepsTracker::MetadataAvailable::kTextScore

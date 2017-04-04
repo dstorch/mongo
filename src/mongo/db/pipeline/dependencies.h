@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/pipeline/field_path.h"
 
 namespace mongo {
 class ParsedDeps;
@@ -47,7 +48,7 @@ struct DepsTracker {
     enum MetadataAvailable { kNoMetadata = 0, kTextScore = 1 };
 
     DepsTracker(MetadataAvailable metadataAvailable = kNoMetadata)
-        : needWholeDocument(false), _metadataAvailable(metadataAvailable), _needTextScore(false) {}
+        : _metadataAvailable(metadataAvailable) {}
 
     /**
      * Returns a projection object covering the dependencies tracked by this class.
@@ -55,10 +56,6 @@ struct DepsTracker {
     BSONObj toProjection() const;
 
     boost::optional<ParsedDeps> toParsedDeps() const;
-
-    std::set<std::string> fields;  // names of needed fields in dotted notation
-    bool needWholeDocument;        // if true, ignore fields and assume the whole document is needed
-
 
     bool hasNoRequirements() const {
         return fields.empty() && !needWholeDocument && !_needTextScore;
@@ -85,9 +82,17 @@ struct DepsTracker {
         _needTextScore = needTextScore;
     }
 
+    // If true, the current set of depended on paths are known exhaustively, and are stored in
+    // 'fields'.
+    bool fieldsKnownExhaustively = false;
+    std::set<std::string> fields;
+
+    // If true, ignore 'fields' and assume the whole document is needed.
+    bool needWholeDocument = false;
+
 private:
     MetadataAvailable _metadataAvailable;
-    bool _needTextScore;
+    bool _needTextScore = false;
 };
 
 /**

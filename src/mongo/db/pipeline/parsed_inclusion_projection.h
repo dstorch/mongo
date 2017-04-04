@@ -71,6 +71,11 @@ public:
      */
     void addDependencies(DepsTracker* deps) const;
 
+    std::set<std::string> getDependenciesOfPath(const FieldPath& path) const;
+
+    void stripExpressionsThatAreNotDependencies(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, std::set<std::string> currentDeps);
+
     /**
      * Loops over 'inputDoc', extracting and appending any included fields into 'outputDoc'. This
      * will also copy over enough information to preserve the structure of the incoming document for
@@ -217,6 +222,14 @@ public:
     DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
         _root->addDependencies(deps);
         return DocumentSource::EXHAUSTIVE_FIELDS;
+    }
+
+    boost::optional<DocumentSource::DepsSupport> newGetDependencies(DepsTracker* deps) const final {
+        _root->addDependencies(deps);
+        DocumentSource::DepsSupport depsSupport;
+        depsSupport.fieldsKnownExhaustively = true;
+        depsSupport.supportsTraceback = true;
+        return depsSupport;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {

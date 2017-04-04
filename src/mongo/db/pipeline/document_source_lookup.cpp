@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -147,7 +148,11 @@ DocumentSource::GetNextResult DocumentSourceLookUp::getNext() {
         makeMatchStageFromInput(inputDoc, _localField, _foreignFieldFieldName, BSONObj());
     // We've already allocated space for the trailing $match stage in '_fromPipeline'.
     _fromPipeline.back() = matchStage;
-    auto pipeline = uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx));
+    // TODO SERVER-25120: Finish or remove experimental dependency tracking system.
+    DepsTracker* trackerToUse =
+        internalQueryTempUseNewDepsTracking.load() ? &_pipelineDeps : nullptr;
+    auto pipeline =
+        uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx, trackerToUse));
 
     std::vector<Value> results;
     int objsize = 0;
@@ -379,7 +384,8 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
             makeMatchStageFromInput(*_input, _localField, _foreignFieldFieldName, filter);
         // We've already allocated space for the trailing $match stage in '_fromPipeline'.
         _fromPipeline.back() = matchStage;
-        _pipeline = uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx));
+        // TODO
+        _pipeline = uassertStatusOK(_mongod->makePipeline(_fromPipeline, _fromExpCtx, nullptr));
 
         _cursorIndex = 0;
         _nextValue = _pipeline->getNext();
@@ -422,6 +428,10 @@ void DocumentSourceLookUp::serializeToArray(
                                       << "foreignField"
                                       << _foreignField.fullPath())));
     if (explain) {
+        if (internalQueryTempUseNewDepsTracking.load() && !_pipelineDeps.needWholeDocument) {
+            output[getSourceName()]["fields"] = Value(_pipelineDeps.toProjection());
+        }
+
         if (_handlingUnwind) {
             const boost::optional<FieldPath> indexPath = _unwindSrc->indexPath();
             output[getSourceName()]["unwinding"] =
@@ -460,6 +470,55 @@ void DocumentSourceLookUp::serializeToArray(
 DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker* deps) const {
     deps->fields.insert(_localField.fullPath());
     return SEE_NEXT;
+}
+
+boost::optional<DocumentSource::DepsSupport> DocumentSourceLookUp::newGetDependencies(
+    DepsTracker* deps) const {
+    deps->fields.insert(_localField.fullPath());
+    DocumentSource::DepsSupport depsSupport;
+    depsSupport.supportsTraceback = true;
+    depsSupport.alwaysAddDependencies = true;
+    return depsSupport;
+}
+
+void DocumentSourceLookUp::doTrackDependencies(DepsTracker* depsTracker) {
+    if (!depsTracker->fieldsKnownExhaustively) {
+        _pipelineDeps.needWholeDocument = true;
+        return;
+    }
+    _pipelineDeps.fieldsKnownExhaustively = true;
+
+    StringData asPath(_as.fullPath());
+    for (auto&& dep : depsTracker->fields) {
+        StringData dependencyStr(dep);
+        if (dependencyStr == asPath) {
+            _pipelineDeps.needWholeDocument = true;
+            break;
+        }
+
+        if (dependencyStr.startsWith(asPath)) {
+            _pipelineDeps.fields.insert(dependencyStr.substr(asPath.size() + 1u).toString());
+        }
+    }
+
+    BSONObj filter = _additionalFilter.value_or(BSONObj());
+    auto matchStage =
+        makeMatchStageFromInput(Document(), _localField, _foreignFieldFieldName, filter);
+    // We've already allocated space for the trailing $match stage in '_fromPipeline'.
+    _fromPipeline.back() = matchStage;
+    auto pipeline = uassertStatusOK(Pipeline::parse(_fromPipeline, _fromExpCtx));
+
+    pipeline->getSources().back()->trackDependencies(&_pipelineDeps);
+}
+
+std::set<std::string> DocumentSourceLookUp::getDependenciesOfPath(const FieldPath& path) const {
+    StringData asPath(_as.fullPath());
+    StringData otherPath(path.fullPath());
+    if (otherPath.startsWith(asPath)) {
+        return {};
+    } else {
+        return {path.fullPath()};
+    }
 }
 
 void DocumentSourceLookUp::doDetachFromOperationContext() {

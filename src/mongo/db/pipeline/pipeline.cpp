@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -336,6 +337,11 @@ void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
 }
 
 DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const {
+    // TODO SERVER-25120: Finish or remove new experimental dependency tracking system.
+    if (internalQueryTempUseNewDepsTracking.load()) {
+        return newGetDependencies(metadataAvailable);
+    }
+
     DepsTracker deps(metadataAvailable);
     bool knowAllFields = false;
     bool knowAllMeta = false;
@@ -382,6 +388,58 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
         deps.setNeedTextScore(false);
     }
 
+    return deps;
+}
+
+bool Pipeline::isTextScoreNeeded(DepsTracker::MetadataAvailable metadataAvailable) const {
+    bool knowAllMeta = false;
+    bool pipelineUsesTextScore = false;
+    for (auto&& source : _sources) {
+        DepsTracker localDeps(metadataAvailable);
+        auto depsReturn = source->getDependencies(&localDeps);
+
+        if (depsReturn == DocumentSource::NOT_SUPPORTED) {
+            break;
+        }
+
+        if (!knowAllMeta) {
+            if (localDeps.getNeedTextScore()) {
+                pipelineUsesTextScore = true;
+            }
+
+            knowAllMeta = depsReturn & DocumentSource::EXHAUSTIVE_META;
+        }
+
+        if (knowAllMeta) {
+            break;
+        }
+    }
+
+    if (metadataAvailable & DepsTracker::MetadataAvailable::kTextScore) {
+        // If there is a text score, assume we need to keep it unless we can prove we don't. If we
+        // are the first half of a pipeline which has been split, later stages might need it.
+        if (!knowAllMeta) {
+            return true;
+        }
+    } else {
+        return false;
+    }
+
+    return pipelineUsesTextScore;
+}
+
+DepsTracker Pipeline::newGetDependencies(DepsTracker::MetadataAvailable metadataAvailable) const {
+    DepsTracker deps(metadataAvailable);
+    if (_sources.empty()) {
+        deps.needWholeDocument = true;
+        return deps;
+    }
+
+    _sources.back()->trackDependencies(&deps);
+    if (!deps.fieldsKnownExhaustively) {
+        deps.needWholeDocument = true;
+    }
+    deps.setNeedTextScore(isTextScoreNeeded(metadataAvailable));
     return deps;
 }
 

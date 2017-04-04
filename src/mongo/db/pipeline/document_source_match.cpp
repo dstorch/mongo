@@ -486,6 +486,22 @@ DocumentSource::GetDepsReturn DocumentSourceMatch::getDependencies(DepsTracker* 
     return SEE_NEXT;
 }
 
+boost::optional<DocumentSource::DepsSupport> DocumentSourceMatch::newGetDependencies(
+    DepsTracker* deps) const {
+    DepsSupport depsSupport;
+    depsSupport.alwaysAddDependencies = true;
+
+    if (isTextQuery()) {
+        // A $text aggregation field should return EXHAUSTIVE_ALL, since we don't necessarily know
+        // what field it will be searching without examining indices.
+        deps->needWholeDocument = true;
+        return depsSupport;
+    }
+
+    addDependencies(deps);
+    return depsSupport;
+}
+
 void DocumentSourceMatch::addDependencies(DepsTracker* deps) const {
     expression::mapOver(_expression.get(), [deps](MatchExpression* node, std::string path) -> void {
         if (!path.empty() &&

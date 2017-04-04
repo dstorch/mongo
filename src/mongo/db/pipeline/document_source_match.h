@@ -59,6 +59,8 @@ public:
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
+    boost::optional<DepsSupport> newGetDependencies(DepsTracker* deps) const final;
+
     /**
      * Convenience method for creating a $match stage.
      */

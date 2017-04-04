@@ -93,6 +93,29 @@ public:
         return DocumentSource::SEE_NEXT;
     }
 
+    boost::optional<DocumentSource::DepsSupport> newGetDependencies(DepsTracker* deps) const final {
+        _root->addDependencies(deps);
+        DocumentSource::DepsSupport depsSupport;
+        depsSupport.supportsTraceback = true;
+        return depsSupport;
+    }
+
+    std::set<std::string> getDependenciesOfPath(const FieldPath& path) const final {
+        auto ret = _root->getDependenciesOfPath(path);
+        if (ret.empty()) {
+            // If 'path' had no dependencies, then it means that it refers to a field that is not
+            // being computed by the addFields stage. In this case we must include 'path' as
+            // dependending on itself.
+            ret.insert(path.fullPath());
+        }
+        return ret;
+    }
+
+    void stripExpressionsThatAreNotDependencies(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, std::set<std::string> currentDeps) {
+        _root->stripExpressionsThatAreNotDependencies(expCtx, currentDeps);
+    }
+
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> computedPaths;
         _root->addComputedPaths(&computedPaths);

@@ -68,7 +68,15 @@ public:
      */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
+
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
+
+    boost::optional<DepsSupport> newGetDependencies(DepsTracker* deps) const final;
+
+    void doTrackDependencies(DepsTracker* depsTracker) final;
+
+    std::set<std::string> getDependenciesOfPath(const FieldPath& path) const final;
+
     void dispose() final;
 
     BSONObjSet getOutputSorts() final {
@@ -155,6 +163,9 @@ private:
     boost::intrusive_ptr<Pipeline> _pipeline;
     boost::optional<Document> _input;
     boost::optional<Document> _nextValue;
+
+    // TODO: document.
+    DepsTracker _pipelineDeps;
 };
 
 }  // namespace mongo

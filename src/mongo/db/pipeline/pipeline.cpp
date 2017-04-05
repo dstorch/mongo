@@ -395,19 +395,17 @@ bool Pipeline::isTextScoreNeeded(DepsTracker::MetadataAvailable metadataAvailabl
     bool knowAllMeta = false;
     bool pipelineUsesTextScore = false;
     for (auto&& source : _sources) {
-        DepsTracker localDeps(metadataAvailable);
-        auto depsReturn = source->getDependencies(&localDeps);
-
-        if (depsReturn == DocumentSource::NOT_SUPPORTED) {
+        auto localDeps = source->getLocalDependencies();
+        if (!localDeps) {
             break;
         }
 
         if (!knowAllMeta) {
-            if (localDeps.getNeedTextScore()) {
+            if (localDeps->needTextScore) {
                 pipelineUsesTextScore = true;
             }
 
-            knowAllMeta = depsReturn & DocumentSource::EXHAUSTIVE_META;
+            knowAllMeta = localDeps->discardsMetadata;
         }
 
         if (knowAllMeta) {

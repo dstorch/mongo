@@ -33,7 +33,6 @@
 #include <string>
 
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/field_path.h"
 
 namespace mongo {
 class ParsedDeps;

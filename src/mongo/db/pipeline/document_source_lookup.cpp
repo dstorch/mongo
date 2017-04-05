@@ -472,13 +472,12 @@ DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker*
     return SEE_NEXT;
 }
 
-boost::optional<DocumentSource::DepsSupport> DocumentSourceLookUp::newGetDependencies(
-    DepsTracker* deps) const {
-    deps->fields.insert(_localField.fullPath());
-    DocumentSource::DepsSupport depsSupport;
-    depsSupport.supportsTraceback = true;
-    depsSupport.alwaysAddDependencies = true;
-    return depsSupport;
+boost::optional<DocumentSource::LocalDeps> DocumentSourceLookUp::getLocalDependencies() const {
+    DocumentSource::LocalDeps deps;
+    deps.fields.insert(_localField.fullPath());
+    deps.supportsTraceback = true;
+    deps.alwaysAddDependencies = true;
+    return deps;
 }
 
 void DocumentSourceLookUp::doTrackDependencies(DepsTracker* depsTracker) {

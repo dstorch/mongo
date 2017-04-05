@@ -63,8 +63,7 @@ public:
         virtual DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const = 0;
 
         // TODO SERVER-25120: make this pure virtual.
-        virtual boost::optional<DocumentSource::DepsSupport> newGetDependencies(
-            DepsTracker* deps) const {
+        virtual boost::optional<DocumentSource::LocalDeps> getLocalDependencies() const {
             return boost::none;
         }
 
@@ -97,8 +96,8 @@ public:
 
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
-    boost::optional<DocumentSource::DepsSupport> newGetDependencies(DepsTracker* deps) const final {
-        return _parsedTransform->newGetDependencies(deps);
+    boost::optional<DocumentSource::LocalDeps> getLocalDependencies() const final {
+        return _parsedTransform->getLocalDependencies();
     }
 
     std::set<std::string> getDependenciesOfPath(const FieldPath& path) const final {

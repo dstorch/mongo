@@ -216,12 +216,37 @@ public:
     };
 
     /**
-     * TODO document.
+     * For a given DocumentSource, stores the dependend on paths in 'fields'. Also describes various
+     * properties of how the stage should behave for dependency tracking.
      */
-    struct DepsSupport {
+    struct LocalDeps {
+        std::set<std::string> fields;
+
+        // If true, 'fields' is ignored since this DocumentSource depends on *all* fields.
+        bool needWholeDocument = false;
+
+        // If true, this stage can name the known finite set of fields which it exports. For
+        // example, the inclusion projection {$project: {_id: 0, foo: 1, bar: 1}} should set this
+        // flag because subsequent stages will only receive the set of fields {"foo", "bar"}.
         bool fieldsKnownExhaustively = false;
-        bool metadataKnownExhaustively = false;
+
+        // This stage does not pass through metadata, e.g. the text score. For example, a $group
+        // stage discards all metadata.
+        bool discardsMetadata = false;
+
+        // Set to true if this stage requires text score metadata in order to do its job.
+        bool needTextScore = false;
+
+        // This stage implements getDependenciesOfPath(), which allows the dependency analysis
+        // system to trace back through the directed acyclic graph of path dependencies.
         bool supportsTraceback = false;
+
+        // This stage has known dependencies which must always be added to the dependency set. For
+        // example, {$match: {x: {$gt: 3}}} will always have "x" as a dependency. This dependency
+        // cannot be stripped out if subsequent stage does not depend on "x". This is useful to
+        // contrast with {$addFields: {x: {$sum: ["$y", "$z"]}}}. In this case, the dependencies "y"
+        // and "z" can potentially be eliminated through getDependenciesOfPath() traceback if
+        // subsequent stages do not depend on "x".
         bool alwaysAddDependencies = false;
     };
 
@@ -444,8 +469,8 @@ public:
     // compute the pipeline is passed down to the query system. This enables covered query plans and
     // saves significant work due to the reduced amount of data flowing through the pipeline.
     //
-    // Document sources which wish to participate in dependency analysis must implement _all_ of the
-    // following virtual methods.
+    // TODO SERVER-25120: Currently, two dependency tracking systems co-exist: getDependencies() and
+    // the experimental getLocalDependencies() / trackDependencies().
     //
 
     /**
@@ -460,15 +485,17 @@ public:
     }
 
     /**
-     * Get the dependencies this operation needs to do its job. If overridden, subclasses must add
-     * all paths needed to apply their transformation to 'deps->fields', and call
-     * 'deps->setNeedTextScore()' if the text score is required.
+     * Finds the paths on which this stage depends in order to do its job. Whereas
+     * trackDependencies() is responsible for analyzes the graph of dependencies across stages, this
+     * method is how stages report their local dependency properties, without knowledge of either
+     * upstream or downstream changes.
      *
-     * Returns boost::none if this stage does not support dependency tracking. Otherwise, returns a
-     * struct which indicates the dependency tracking functionality supported by this stage. See
-     * DepsSupport documentation for more details.
+     * Returns boost::none if this stage does not support dependency tracking, which is the default
+     * behavior. Otherwise, returns a struct containing the depended on paths. The struct is also
+     * filled out with flags which indicate the dependency tracking functionality supported by this
+     * stage. See LocalDeps documentation for more details.
      */
-    virtual boost::optional<DepsSupport> newGetDependencies(DepsTracker* deps) const {
+    virtual boost::optional<LocalDeps> getLocalDependencies() const {
         return boost::none;
     }
 
@@ -476,6 +503,10 @@ public:
      * Fills out 'depsTracker' with the set of fields that are needed by the pipeline. If all fields
      * are needed, sets DepsTracker::needWholeDocument to true. Also sets whether the text score
      * must be requested from the underlying collection on 'depsTracker'.
+     *
+     * Whereas getLocalDependencies() is how stages report their dependency properties without
+     * knowledge of other stages, this method is responsible for analyzing the dependency graph
+     * across all pipeline stages.
      *
      * Calls doTrackDependencies() on each stage as a hook for any special behavior.
      */
@@ -494,6 +525,9 @@ public:
      *
      * Calling getDependenciesOfPath("newPath") on this stage should return the set {"oldPath1",
      * "oldPath2"}.
+     *
+     * Implementers who override this method should consider carefully whether
+     * stripExpressionsThatAreNotDependencies() must also be implemented.
      */
     virtual std::set<std::string> getDependenciesOfPath(const FieldPath& path) const {
         return {};

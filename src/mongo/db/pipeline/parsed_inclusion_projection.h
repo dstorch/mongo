@@ -224,12 +224,15 @@ public:
         return DocumentSource::EXHAUSTIVE_FIELDS;
     }
 
-    boost::optional<DocumentSource::DepsSupport> newGetDependencies(DepsTracker* deps) const final {
-        _root->addDependencies(deps);
-        DocumentSource::DepsSupport depsSupport;
-        depsSupport.fieldsKnownExhaustively = true;
-        depsSupport.supportsTraceback = true;
-        return depsSupport;
+    boost::optional<DocumentSource::LocalDeps> getLocalDependencies() const final {
+        DepsTracker depsTracker;
+        _root->addDependencies(&depsTracker);
+
+        DocumentSource::LocalDeps localDeps;
+        localDeps.fields.insert(depsTracker.fields.begin(), depsTracker.fields.end());
+        localDeps.fieldsKnownExhaustively = true;
+        localDeps.supportsTraceback = true;
+        return localDeps;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {

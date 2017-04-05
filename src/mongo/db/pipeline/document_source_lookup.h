@@ -71,7 +71,7 @@ public:
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
-    boost::optional<DepsSupport> newGetDependencies(DepsTracker* deps) const final;
+    boost::optional<LocalDeps> getLocalDependencies() const final;
 
     void doTrackDependencies(DepsTracker* depsTracker) final;
 

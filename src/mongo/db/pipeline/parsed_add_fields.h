@@ -93,11 +93,14 @@ public:
         return DocumentSource::SEE_NEXT;
     }
 
-    boost::optional<DocumentSource::DepsSupport> newGetDependencies(DepsTracker* deps) const final {
-        _root->addDependencies(deps);
-        DocumentSource::DepsSupport depsSupport;
-        depsSupport.supportsTraceback = true;
-        return depsSupport;
+    boost::optional<DocumentSource::LocalDeps> getLocalDependencies() const final {
+        DepsTracker depsTracker;
+        _root->addDependencies(&depsTracker);
+
+        DocumentSource::LocalDeps localDeps;
+        localDeps.fields.insert(depsTracker.fields.begin(), depsTracker.fields.end());
+        localDeps.supportsTraceback = true;
+        return localDeps;
     }
 
     std::set<std::string> getDependenciesOfPath(const FieldPath& path) const final {

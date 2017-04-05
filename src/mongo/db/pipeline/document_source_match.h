@@ -59,7 +59,7 @@ public:
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
-    boost::optional<DepsSupport> newGetDependencies(DepsTracker* deps) const final;
+    boost::optional<LocalDeps> getLocalDependencies() const final;
 
     /**
      * Convenience method for creating a $match stage.
@@ -148,7 +148,8 @@ private:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    void addDependencies(DepsTracker* deps) const;
+    template <typename DepsType>
+    void addDependencies(DepsType* deps) const;
 
     std::unique_ptr<MatchExpression> _expression;
 

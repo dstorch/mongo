@@ -266,15 +266,14 @@ void DocumentSource::trackDependencies(DepsTracker* depsTracker) {
 
     doTrackDependencies(depsTracker);
 
-    DepsTracker localDeps;
-    auto depsSupport = newGetDependencies(&localDeps);
-    const bool currentStageExhaustive = depsSupport && depsSupport->fieldsKnownExhaustively;
+    auto localDeps = getLocalDependencies();
+    const bool currentStageExhaustive = localDeps && localDeps->fieldsKnownExhaustively;
     if (!depsTracker->fieldsKnownExhaustively) {
         if (currentStageExhaustive) {
             // Found our first exhaustive stage. Seed the dependency set and tag the tracker with
             // this knowledge.
             invariant(depsTracker->fields.empty());
-            depsTracker->fields.insert(localDeps.fields.begin(), localDeps.fields.end());
+            depsTracker->fields.insert(localDeps->fields.begin(), localDeps->fields.end());
             depsTracker->fieldsKnownExhaustively = true;
         } else {
             // We haven't yet found any exhaustive stages, so there's no work to do, other than
@@ -286,7 +285,7 @@ void DocumentSource::trackDependencies(DepsTracker* depsTracker) {
 
     // If dependency tracking is not supported, we'll need the whole document. We may find another
     // exhaustive stage later, however, in which case dependency tracking will resume.
-    if (!depsSupport) {
+    if (!localDeps) {
         depsTracker->needWholeDocument = true;
         return;
     }
@@ -298,11 +297,11 @@ void DocumentSource::trackDependencies(DepsTracker* depsTracker) {
         depsTracker->needWholeDocument = false;
     }
 
-    if (localDeps.needWholeDocument) {
+    if (localDeps->needWholeDocument) {
         depsTracker->needWholeDocument = true;
     }
 
-    if (depsSupport->supportsTraceback) {
+    if (localDeps->supportsTraceback) {
         // This stage supports narrowing the dependency set by tracing back through the dependency
         // graph.
         std::set<std::string> currentDeps;
@@ -318,9 +317,9 @@ void DocumentSource::trackDependencies(DepsTracker* depsTracker) {
         }
     }
 
-    if (depsSupport->alwaysAddDependencies) {
+    if (localDeps->alwaysAddDependencies) {
         // This stage can have dependencies which need to be added unconditionally.
-        depsTracker->fields.insert(localDeps.fields.begin(), localDeps.fields.end());
+        depsTracker->fields.insert(localDeps->fields.begin(), localDeps->fields.end());
     }
 }
 }  // namespace mongo

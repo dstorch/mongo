@@ -142,6 +142,9 @@ public:
         const std::string& path,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+protected:
+    DepsSupport doTrackDependencies(DepsTracker* deps) final;
+
 private:
     DocumentSourceMatch(const BSONObj& query,
                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);

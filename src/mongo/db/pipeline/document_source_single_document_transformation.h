@@ -58,6 +58,12 @@ public:
         virtual Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const = 0;
         virtual DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const = 0;
         virtual GetModPathsReturn getModifiedPaths() const = 0;
+
+        // TODO SERVER-25120: make this pure virtual.
+        virtual DocumentSource::DepsSupport doTrackDependencies(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx, DepsTracker* deps) {
+            return DocumentSource::DepsSupport::kNotSupported;
+        }
     };
 
     DocumentSourceSingleDocumentTransformation(
@@ -75,6 +81,10 @@ public:
                                                      Pipeline::SourceContainer* container) final;
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
+
+    DepsSupport doTrackDependencies(DepsTracker* deps) final {
+        return _parsedTransform->doTrackDependencies(pExpCtx, deps);
+    }
 
     bool canSwapWithMatch() const final {
         return true;

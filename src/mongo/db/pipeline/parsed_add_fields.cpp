@@ -144,5 +144,30 @@ void ParsedAddFields::parseSubObject(const boost::intrusive_ptr<ExpressionContex
     }
 }
 
+DocumentSource::DepsSupport ParsedAddFields::doTrackDependencies(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, DepsTracker* deps) {
+    if (deps->needWholeDocument) {
+        return DocumentSource::DepsSupport::kSupported;
+    }
+
+    std::set<std::string> currentDeps;
+    currentDeps.swap(deps->fields);
+
+    _root->stripExpressionsThatAreNotDependencies(expCtx, currentDeps);
+
+    for (auto&& path : currentDeps) {
+        auto depsOf = _root->getDependenciesOfPath(FieldPath(path));
+        if (depsOf.empty()) {
+            // If 'path' had no dependencies, then it refers to a field that is not being computed
+            // by the addFields stage. In this case we must still include 'path' as a dependency.
+            deps->fields.insert(path);
+        } else {
+            deps->fields.insert(depsOf.begin(), depsOf.end());
+        }
+    }
+
+    return DocumentSource::DepsSupport::kSupported;
+}
+
 }  // namespace parsed_aggregation_projection
 }  // namespace mongo

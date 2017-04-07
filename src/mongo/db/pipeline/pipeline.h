@@ -202,6 +202,12 @@ private:
      */
     Status ensureAllStagesAreInLegalPositions() const;
 
+    /**
+     * TODO SERVER-251210: This is a new dependency tracking system meant to replace the old one. It
+     * should either be finished or removed.
+     */
+    DepsTracker newGetDependencies(DepsTracker::MetadataAvailable metadataAvailable) const;
+
     SourceContainer _sources;
 
     boost::intrusive_ptr<ExpressionContext> pCtx;

@@ -93,6 +93,9 @@ public:
         return DocumentSource::SEE_NEXT;
     }
 
+    DocumentSource::DepsSupport doTrackDependencies(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, DepsTracker* deps) final;
+
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> computedPaths;
         _root->addComputedPaths(&computedPaths);

@@ -84,7 +84,7 @@ const char* DocumentSource::getSourceName() const {
 }
 
 void DocumentSource::setSource(DocumentSource* pTheSource) {
-    verify(!isValidInitialSource());
+    invariant(!pTheSource || !isValidInitialSource());
     pSource = pTheSource;
 }
 
@@ -254,4 +254,16 @@ BSONObjSet DocumentSource::truncateSortSet(const BSONObjSet& sorts,
 
     return out;
 }
+
+void DocumentSource::trackDependencies(DepsTracker* deps) {
+    auto depsSupport = doTrackDependencies(deps);
+    if (depsSupport == DepsSupport::kNotSupported) {
+        deps->needWholeDocument = true;
+    }
+
+    if (pSource) {
+        pSource->trackDependencies(deps);
+    }
 }
+
+}  // namespace mongo

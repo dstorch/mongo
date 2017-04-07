@@ -92,6 +92,10 @@ extern AtomicBool internalQueryPlanOrChildrenIndependently;
 // during explodeForSort?
 extern AtomicInt32 internalQueryMaxScansToExplode;
 
+// TODO SERVER-25120: This is a temporary parameter to enable the new experimental dependency
+// tracking system. It needs to be either finished or deleted.
+extern AtomicBool internalQueryTempUseNewDepsTracking;
+
 //
 // Query execution.
 //

@@ -399,6 +399,9 @@ void PipelineD::prepareCursorSource(Collection* collection,
         }
     }
 
+    // TODO this needs to be worked out...
+    pipeline->stitch();
+
     // Find the set of fields in the source documents depended on by this pipeline.
     DepsTracker deps = pipeline->getDependencies(DocumentSourceMatch::isTextQuery(queryObj)
                                                      ? DepsTracker::MetadataAvailable::kTextScore

@@ -193,6 +193,17 @@ public:
         Document _result;
     };
 
+    /**
+     * Indicates this stage's level of support for dependency tracking.
+     *
+     * TODO SERVER-25120 make this protected.
+     */
+    enum class DepsSupport {
+        kSupported,
+        kNotSupported,
+    };
+
+
     virtual ~DocumentSource() {}
 
     /**
@@ -435,6 +446,11 @@ public:
         return NOT_SUPPORTED;
     }
 
+    /**
+     * TODO document.
+     */
+    void trackDependencies(DepsTracker* deps);
+
 protected:
     /**
        Base constructor.
@@ -458,6 +474,12 @@ protected:
         return std::next(itr);
     };
 
+    /**
+     * TODO document.
+     */
+    virtual DepsSupport doTrackDependencies(DepsTracker* deps) {
+        return DepsSupport::kNotSupported;
+    }
 
     /*
       Most DocumentSources have an underlying source they get their data

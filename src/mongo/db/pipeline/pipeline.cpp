@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -301,6 +302,7 @@ void Pipeline::stitch() {
     }
     // Chain together all the stages.
     DocumentSource* prevSource = _sources.front().get();
+    prevSource->setSource(nullptr);
     for (SourceContainer::iterator iter(++_sources.begin()), listEnd(_sources.end());
          iter != listEnd;
          ++iter) {
@@ -336,6 +338,19 @@ void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
 }
 
 DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAvailable) const {
+    // TODO SERVER-25120: Finish or remove new experimental dependency tracking system.
+    if (internalQueryTempUseNewDepsTracking.load()) {
+        // TODO clean up these prints.
+        auto deps = newGetDependencies(metadataAvailable);
+        std::cout << "!!! needWholeDocument: " << deps.needWholeDocument << std::endl;
+        std::cout << "!!! { ";
+        for (auto&& field : deps.fields) {
+            std::cout << field << " ";
+        }
+        std::cout << "}" << std::endl;
+        return deps;
+    }
+
     DepsTracker deps(metadataAvailable);
     bool knowAllFields = false;
     bool knowAllMeta = false;
@@ -382,6 +397,17 @@ DepsTracker Pipeline::getDependencies(DepsTracker::MetadataAvailable metadataAva
         deps.setNeedTextScore(false);
     }
 
+    return deps;
+}
+
+DepsTracker Pipeline::newGetDependencies(DepsTracker::MetadataAvailable metadataAvailable) const {
+    DepsTracker deps(metadataAvailable);
+    deps.needWholeDocument = true;
+    if (_sources.empty()) {
+        return deps;
+    }
+
+    _sources.back()->trackDependencies(&deps);
     return deps;
 }
 

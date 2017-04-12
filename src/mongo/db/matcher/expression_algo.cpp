@@ -283,6 +283,24 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
     return std::move(splitNor);
 }
 
+void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames) {
+    if (expr->isArray() || expr->matchType() == MatchExpression::TYPE_OPERATOR) {
+        return;
+    }
+
+    if (expr->isLeaf()) {
+        auto it = renames.find(expr->path());
+        if (it != renames.end()) {
+            LeafMatchExpression* leafExpr = checked_cast<LeafMatchExpression*>(expr);
+            leafExpr->setPath(it->second);
+        }
+    }
+
+    for (size_t i = 0; i < expr->numChildren(); ++i) {
+        applyRenamesToExpression(expr->getChild(i), renames);
+    }
+}
+
 }  // namespace
 
 namespace expression {
@@ -348,15 +366,27 @@ bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& p
         return true;
     }
 
-    // At this point, we know 'expr' is a leaf. If it is an elemMatch, we do not attempt to
-    // determine if it is independent or not, and instead just return false.
-    return !isElemMatch(expr) && isLeafIndependentOf(expr.path(), pathSet);
+    // Certain kinds of match expressions are never considered independent.
+    if (expr.isArray() || expr.matchType() == MatchExpression::TYPE_OPERATOR) {
+        return false;
+    }
+
+    return isLeafIndependentOf(expr.path(), pathSet);
 }
 
 std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchExpressionBy(
-    unique_ptr<MatchExpression> expr, const std::set<std::string>& fields) {
+    unique_ptr<MatchExpression> expr,
+    const std::set<std::string>& fields,
+    const StringMap<std::string>& renames) {
+    // TODO SERVER-27115: Currently renames from dotted fields are not supported, but this
+    // restriction can be relaxed.
+    for (auto&& rename : renames) {
+        invariant(rename.second.find('.') == std::string::npos);
+    }
+
     if (isIndependentOf(*expr, fields)) {
         // 'expr' does not depend upon 'fields', so it can be completely moved.
+        applyRenamesToExpression(expr.get(), renames);
         return {std::move(expr), nullptr};
     }
     if (!expr->isLogical()) {
@@ -371,11 +401,12 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
         case MatchExpression::AND: {
             auto andExpr = checked_cast<AndMatchExpression*>(expr.get());
             for (size_t i = 0; i < andExpr->numChildren(); i++) {
-                auto children = splitMatchExpressionBy(andExpr->releaseChild(i), fields);
+                auto children = splitMatchExpressionBy(andExpr->releaseChild(i), fields, renames);
 
                 invariant(children.first || children.second);
 
                 if (children.first) {
+                    applyRenamesToExpression(children.first.get(), renames);
                     separate.push_back(std::move(children.first));
                 }
                 if (children.second) {
@@ -397,6 +428,7 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
             for (size_t i = 0; i < norExpr->numChildren(); i++) {
                 auto child = norExpr->releaseChild(i);
                 if (isIndependentOf(*child, fields)) {
+                    applyRenamesToExpression(child.get(), renames);
                     separate.push_back(std::move(child));
                 } else {
                     reliant.push_back(std::move(child));

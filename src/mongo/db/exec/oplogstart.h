@@ -60,6 +60,8 @@ class RecordCursor;
  *
  * Why is this a stage?  Because we want to yield, and we want to be notified of RecordId
  * invalidations.  :(
+ *
+ * TODO: I think this entire stage is MMAP-specific. It should probably just be deleted entirely.
  */
 class OplogStart final : public PlanStage {
 public:
@@ -72,7 +74,6 @@ public:
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
 
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;

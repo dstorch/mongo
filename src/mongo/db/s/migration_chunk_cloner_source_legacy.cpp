@@ -89,18 +89,14 @@ BSONObj createRequestWithSessionId(StringData commandName,
 
 /**
  * Used to receive invalidation notifications from operations, which delete documents.
+ *
+ * TODO: Need to figure out how to clean this up. Looks like it existed specifically to receive
+ * notifications. Can we make this disappear entirely once MMAP is gone?
  */
 class DeleteNotificationStage final : public PlanStage {
 public:
     DeleteNotificationStage(MigrationChunkClonerSourceLegacy* cloner, OperationContext* opCtx)
         : PlanStage("SHARDING_NOTIFY_DELETE", opCtx), _cloner(cloner) {}
-
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) override {
-        if (type == INVALIDATION_DELETION) {
-            stdx::lock_guard<stdx::mutex> sl(_cloner->_mutex);
-            _cloner->_cloneLocs.erase(dl);
-        }
-    }
 
     StageState doWork(WorkingSetID* out) override {
         MONGO_UNREACHABLE;

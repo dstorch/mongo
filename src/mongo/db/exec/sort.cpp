@@ -187,30 +187,6 @@ PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
-void SortStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    // If we have a deletion, we can fetch and carry on.
-    // If we have a mutation, it's easier to fetch and use the previous document.
-    // So, no matter what, fetch and keep the doc in play.
-
-    // _data contains indices into the WorkingSet, not actual data.  If a WorkingSetMember in
-    // the WorkingSet needs to change state as a result of a RecordId invalidation, it will still
-    // be at the same spot in the WorkingSet.  As such, we don't need to modify _data.
-    DataMap::iterator it = _wsidByRecordId.find(dl);
-
-    // If we're holding on to data that's got the RecordId we're invalidating...
-    if (_wsidByRecordId.end() != it) {
-        // Grab the WSM that we're nuking.
-        WorkingSetMember* member = _ws->get(it->second);
-        verify(member->recordId == dl);
-
-        WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-
-        // Remove the RecordId from our set of active DLs.
-        _wsidByRecordId.erase(it);
-        ++_specificStats.forcedFetches;
-    }
-}
-
 unique_ptr<PlanStageStats> SortStage::getStats() {
     _commonStats.isEOF = isEOF();
     const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes.load());

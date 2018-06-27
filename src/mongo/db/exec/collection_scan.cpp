@@ -234,29 +234,6 @@ bool CollectionScan::isEOF() {
     return _commonStats.isEOF || _isDead;
 }
 
-void CollectionScan::doInvalidate(OperationContext* opCtx,
-                                  const RecordId& id,
-                                  InvalidationType type) {
-    // We don't care about mutations since we apply any filters to the result when we (possibly)
-    // return it.
-    if (INVALIDATION_DELETION != type) {
-        return;
-    }
-
-    // If we're here, 'id' is being deleted.
-
-    // Deletions can harm the underlying RecordCursor so we must pass them down.
-    if (_cursor) {
-        _cursor->invalidate(opCtx, id);
-    }
-
-    if (_params.tailable && id == _lastSeenId) {
-        // This means that deletes have caught up to the reader. We want to error in this case
-        // so readers don't miss potentially important data.
-        _isDead = true;
-    }
-}
-
 void CollectionScan::doSaveState() {
     if (_cursor) {
         _cursor->save();

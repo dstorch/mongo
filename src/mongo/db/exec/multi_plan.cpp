@@ -410,45 +410,6 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
     return !doneWorking;
 }
 
-namespace {
-
-void invalidateHelper(OperationContext* opCtx,
-                      WorkingSet* ws,  // may flag for review
-                      const RecordId& recordId,
-                      list<WorkingSetID>* idsToInvalidate,
-                      const Collection* collection) {
-    for (auto it = idsToInvalidate->begin(); it != idsToInvalidate->end(); ++it) {
-        WorkingSetMember* member = ws->get(*it);
-        if (member->hasRecordId() && member->recordId == recordId) {
-            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, collection);
-        }
-    }
-}
-
-}  // namespace
-
-void MultiPlanStage::doInvalidate(OperationContext* opCtx,
-                                  const RecordId& recordId,
-                                  InvalidationType type) {
-    if (_failure) {
-        return;
-    }
-
-    if (bestPlanChosen()) {
-        CandidatePlan& bestPlan = _candidates[_bestPlanIdx];
-        invalidateHelper(opCtx, bestPlan.ws, recordId, &bestPlan.results, _collection);
-        if (hasBackupPlan()) {
-            CandidatePlan& backupPlan = _candidates[_backupPlanIdx];
-            invalidateHelper(opCtx, backupPlan.ws, recordId, &backupPlan.results, _collection);
-        }
-    } else {
-        for (size_t ix = 0; ix < _candidates.size(); ++ix) {
-            invalidateHelper(
-                opCtx, _candidates[ix].ws, recordId, &_candidates[ix].results, _collection);
-        }
-    }
-}
-
 bool MultiPlanStage::hasBackupPlan() const {
     return kNoSuchPlan != _backupPlanIdx;
 }

@@ -402,15 +402,12 @@ Status MMAPV1DatabaseCatalogEntry::_renameSingleNamespace(OperationContext* opCt
     return Status::OK();
 }
 
+// TODO: This is broken now. Need to decide whether we can merge a change like this, breaking
+// MMAPv1, or just wait for the MMAP code to be deleted entirely.
 void MMAPV1DatabaseCatalogEntry::invalidateSystemCollectionRecord(
     OperationContext* opCtx, NamespaceString systemCollectionNamespace, RecordId record) {
     // Having to go back up through the DatabaseHolder is a bit of a layering
     // violation, but at this point we're not going to add more MMAPv1 specific interfaces.
-    StringData dbName = systemCollectionNamespace.db();
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
-    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
-    Collection* systemCollection = db->getCollection(opCtx, systemCollectionNamespace);
-    systemCollection->getCursorManager()->invalidateDocument(opCtx, record, INVALIDATION_DELETION);
 }
 
 void MMAPV1DatabaseCatalogEntry::appendExtraStats(OperationContext* opCtx,

@@ -90,6 +90,9 @@ namespace mongo {
  * same interval and the invalidation occurs between the scan of the first cell and the second, so
  * NearStage no longer knows that it's seen this document before.
  *
+ * TODO: I think the comment above needs to change (and investigate whether we can simplify the code
+ * here at all).
+ *
  * TODO: Right now the interface allows the nextCovering() to be adaptive, but doesn't allow
  * aborting and shrinking a covered range being buffered if we guess wrong.
  */
@@ -101,8 +104,6 @@ public:
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
-
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final;
     std::unique_ptr<PlanStageStats> getStats() final;

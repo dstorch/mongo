@@ -65,8 +65,6 @@ public:
 
     StageState doWork(WorkingSetID* out) final;
 
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
-
     StageType stageType() const final {
         return STAGE_CACHED_PLAN;
     }

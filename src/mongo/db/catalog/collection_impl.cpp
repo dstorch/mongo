@@ -526,9 +526,6 @@ void CollectionImpl::notifyCappedWaitersIfNeeded() {
 Status CollectionImpl::aboutToDeleteCapped(OperationContext* opCtx,
                                            const RecordId& loc,
                                            RecordData data) {
-    /* check if any cursors point to us.  if so, advance them. */
-    _cursorManager.invalidateDocument(opCtx, loc, INVALIDATION_DELETION);
-
     BSONObj doc = data.releaseToBson();
     int64_t* const nullKeysDeleted = nullptr;
     _indexCatalog.unindexRecord(opCtx, doc, loc, false, nullKeysDeleted);
@@ -562,9 +559,6 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     if (storeDeletedDoc == Collection::StoreDeletedDoc::On) {
         deletedDoc.emplace(doc.value().getOwned());
     }
-
-    /* check if any cursors point to us.  if so, advance them. */
-    _cursorManager.invalidateDocument(opCtx, loc, INVALIDATION_DELETION);
 
     int64_t keysDeleted;
     _indexCatalog.unindexRecord(opCtx, doc.value(), loc, noWarn, &keysDeleted);
@@ -718,8 +712,6 @@ StatusWith<RecordId> CollectionImpl::_updateDocumentWithMove(OperationContext* o
 
     invariant(newLocation.getValue() != oldLocation);
 
-    _cursorManager.invalidateDocument(opCtx, oldLocation, INVALIDATION_DELETION);
-
     args->preImageDoc = oldDoc.value().getOwned();
 
     // Remove indexes for old record.
@@ -755,10 +747,9 @@ StatusWith<RecordId> CollectionImpl::_updateDocumentWithMove(OperationContext* o
     return newLocation;
 }
 
+// TODO: Looks like this method can go away.
 Status CollectionImpl::recordStoreGoingToUpdateInPlace(OperationContext* opCtx,
                                                        const RecordId& loc) {
-    // Broadcast the mutation so that query results stay correct.
-    _cursorManager.invalidateDocument(opCtx, loc, INVALIDATION_MUTATION);
     return Status::OK();
 }
 
@@ -780,9 +771,6 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
     invariant(oldRec.snapshotId() == opCtx->recoveryUnit()->getSnapshotId());
     invariant(updateWithDamagesSupported());
-
-    // Broadcast the mutation so that query results stay correct.
-    _cursorManager.invalidateDocument(opCtx, loc, INVALIDATION_MUTATION);
 
     auto newRecStatus =
         _recordStore->updateWithDamages(opCtx, loc, oldRec.value(), damageSource, damages);

@@ -77,8 +77,6 @@ public:
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;
 
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
-
     StageType stageType() const final {
         return STAGE_SORT;
     }
@@ -171,6 +169,9 @@ private:
     std::vector<SortableDataItem>::iterator _resultIterator;
 
     // We buffer a lot of data and we want to look it up by RecordId quickly upon invalidation.
+    //
+    // TODO: Looks like the whole point of this thing is to support invalidation. It should probs
+    // just go away.
     typedef stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
     DataMap _wsidByRecordId;
 

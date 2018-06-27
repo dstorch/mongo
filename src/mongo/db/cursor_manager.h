@@ -34,7 +34,6 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/generic_cursor.h"
-#include "mongo/db/invalidation_type.h"
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
@@ -123,12 +122,6 @@ public:
     void invalidateAll(OperationContext* opCtx,
                        bool collectionGoingAway,
                        const std::string& reason);
-
-    /**
-     * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
-     * must called *before* the provided RecordId is about to be deleted or mutated.
-     */
-    void invalidateDocument(OperationContext* opCtx, const RecordId& dl, InvalidationType type);
 
     /**
      * Destroys cursors that have been inactive for too long.

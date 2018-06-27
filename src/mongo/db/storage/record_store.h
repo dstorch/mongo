@@ -199,6 +199,8 @@ public:
      *
      * WARNING: Storage engines other than MMAPv1 should use the default implementation,
      *          and not depend on this being called.
+     *
+     * TODO: Can this go away? This looks like it is MMAPv1-specific.
      */
     virtual void invalidate(OperationContext* opCtx, const RecordId& id) {}
 

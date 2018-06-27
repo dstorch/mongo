@@ -497,6 +497,8 @@ struct OrStats : public SpecificStats {
     size_t dupsDropped;
 
     // How many calls to invalidate(...) actually removed a RecordId from our deduping map?
+    //
+    // TODO: Looks like this can be removed now?
     size_t recordIdsForgotten;
 };
 
@@ -521,6 +523,8 @@ struct SortStats : public SpecificStats {
     }
 
     // How many records were we forced to fetch as the result of an invalidation?
+    //
+    // TODO: This looks like it is invalidation-specific, so it can go away.
     size_t forcedFetches;
 
     // What's our current memory usage?

@@ -284,23 +284,6 @@ bool NearStage::isEOF() {
     return SearchState_Finished == _searchState;
 }
 
-void NearStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    // If a result is in _resultBuffer and has a RecordId it will be in _seenDocuments as
-    // well. It's safe to return the result w/o the RecordId, so just fetch the result.
-    stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher>::iterator seenIt =
-        _seenDocuments.find(dl);
-
-    if (seenIt != _seenDocuments.end()) {
-        WorkingSetMember* member = _workingSet->get(seenIt->second);
-        verify(member->hasRecordId());
-        WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-        verify(!member->hasRecordId());
-
-        // Don't keep it around in the seen map since there's no valid RecordId anymore
-        _seenDocuments.erase(seenIt);
-    }
-}
-
 unique_ptr<PlanStageStats> NearStage::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, _stageType);
     ret->specific.reset(_specificStats.clone());

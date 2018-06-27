@@ -295,17 +295,6 @@ PlanStage::StageState CachedPlanStage::doWork(WorkingSetID* out) {
     return child()->work(out);
 }
 
-void CachedPlanStage::doInvalidate(OperationContext* opCtx,
-                                   const RecordId& dl,
-                                   InvalidationType type) {
-    for (auto it = _results.begin(); it != _results.end(); ++it) {
-        WorkingSetMember* member = _ws->get(*it);
-        if (member->hasRecordId() && member->recordId == dl) {
-            WorkingSetCommon::fetchAndInvalidateRecordId(opCtx, member, _collection);
-        }
-    }
-}
-
 std::unique_ptr<PlanStageStats> CachedPlanStage::getStats() {
     _commonStats.isEOF = isEOF();
 

@@ -166,20 +166,6 @@ bool OplogStart::isEOF() {
     return _done;
 }
 
-void OplogStart::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
-    if (_needInit) {
-        return;
-    }
-
-    if (INVALIDATION_DELETION != type) {
-        return;
-    }
-
-    for (size_t i = 0; i < _subIterators.size(); i++) {
-        _subIterators[i]->invalidate(opCtx, dl);
-    }
-}
-
 void OplogStart::doSaveState() {
     for (size_t i = 0; i < _subIterators.size(); i++) {
         _subIterators[i]->save();

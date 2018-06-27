@@ -49,6 +49,8 @@ namespace mongo {
  * is fetched and added to the WorkingSet as "flagged for further review."  Because this stage
  * operates with RecordIds, we are unable to evaluate the AND for the invalidated RecordId, and it
  * must be fully matched later.
+ *
+ * TODO: There are probably simplifications that can be made here in the absence of invalidation.
  */
 class AndHashStage final : public PlanStage {
 public:
@@ -72,8 +74,6 @@ public:
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
-
-    void doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
         return STAGE_AND_HASH;

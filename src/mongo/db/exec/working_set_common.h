@@ -44,6 +44,8 @@ public:
      * Get an owned copy of the BSONObj the WSM refers to.
      * Requires either a valid BSONObj or valid RecordId.
      * Returns true if the fetch and invalidate succeeded, false otherwise.
+     *
+     * TODO: Is "invalidate" the wrong name here? Are there any more callers?
      */
     static bool fetchAndInvalidateRecordId(OperationContext* opCtx,
                                            WorkingSetMember* member,

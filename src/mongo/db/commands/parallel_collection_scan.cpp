@@ -157,7 +157,7 @@ public:
             exec->detachFromOperationContext();
 
             // Create and register a new ClientCursor.
-            auto pinnedCursor = collection->getCursorManager()->registerCursor(
+            auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
                 opCtx,
                 {std::move(exec),
                  nss,

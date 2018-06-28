@@ -149,6 +149,7 @@ int64_t GlobalCursorIdCache::nextSeed() {
     return _secureRandom->nextInt64();
 }
 
+// TODO: This won't be needed once all cursors are globally managed.
 uint32_t GlobalCursorIdCache::registerCursorManager(const NamespaceString& nss) {
     static const uint32_t kMaxIds = 1000 * 1000 * 1000;
     static_assert((kMaxIds & (0b11 << 30)) == 0,

@@ -31,7 +31,7 @@
 #include <memory>
 
 #include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/record_id.h"
 
@@ -48,7 +48,7 @@ class OperationContext;
  *
  * Preconditions: Valid RecordId.
  */
-class CollectionScan final : public PlanStage {
+class CollectionScan final : public RequiresCollectionStage {
 public:
     CollectionScan(OperationContext* opCtx,
                    const CollectionScanParams& params,
@@ -58,8 +58,6 @@ public:
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
 
-    void doSaveState() final;
-    void doRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
 
@@ -76,6 +74,11 @@ public:
     const SpecificStats* getSpecificStats() const final;
 
     static const char* kStageType;
+
+protected:
+    void doRequiresCollectionStageSaveState() final;
+
+    void doRequiresCollectionStageRestoreState() final;
 
 private:
     /**
@@ -113,6 +116,8 @@ private:
     // We allocate a working set member with this id on construction of the stage. It gets used for
     // all fetch requests. This should only be used for passing up the Fetcher for a NEED_YIELD, and
     // should remain in the INVALID state.
+    //
+    // TODO: This can go away, probably.
     const WorkingSetID _wsidForFetch;
 
     // If _params.shouldTrackLatestOplogTimestamp is set and the collection is the oplog, the latest

@@ -370,7 +370,12 @@ Status PlanExecutor::restoreStateWithoutRetrying() {
     invariant(_currentState == kSaved);
 
     if (!isMarkedAsKilled()) {
-        _root->restoreState();
+        // TODO: We should propagate the error as an exception if possible.
+        try {
+            _root->restoreState();
+        } catch (const DBException& ex) {
+            return {ex.toStatus()};
+        }
     }
 
     _currentState = kUsable;
@@ -519,6 +524,8 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
     // to use to pull the record into memory. We take ownership of the RecordFetcher here,
     // deleting it after we've had a chance to do the fetch. For timing-based yields, we
     // just pass a NULL fetcher.
+    //
+    // TODO: The RecordFetcher is MMAPv1-specific. It should go away.
     unique_ptr<RecordFetcher> fetcher;
 
     // Incremented on every writeConflict, reset to 0 on any successful call to _root->work.

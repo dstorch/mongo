@@ -303,6 +303,8 @@ public:
      * PlanExecutor is killed during this retry process, returns ErrorCodes::QueryPlanKilled. In
      * this scenario, locks will have been released, and will not be held when control returns to
      * the caller.
+     *
+     * TODO: Is there any reason not to convert this to a throwing interface?
      */
     Status restoreState();
 

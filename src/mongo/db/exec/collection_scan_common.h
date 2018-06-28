@@ -41,8 +41,7 @@ struct CollectionScanParams {
         BACKWARD = -1,
     };
 
-    // What collection?
-    // not owned
+    // A pointer to the catalog object for the collection being scanned.
     const Collection* collection = nullptr;
 
     // isNull by default.  If you specify any value for this, you're responsible for the RecordId

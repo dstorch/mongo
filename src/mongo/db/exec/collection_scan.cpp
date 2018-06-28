@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
@@ -43,8 +44,6 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-
-#include "mongo/db/client.h"  // XXX-ERH
 
 namespace mongo {
 
@@ -59,7 +58,7 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)
-    : PlanStage(kStageType, opCtx),
+    : RequiresCollectionStage(kStageType, opCtx, params.collection),
       _workingSet(workingSet),
       _filter(filter),
       _params(params),
@@ -68,7 +67,7 @@ CollectionScan::CollectionScan(OperationContext* opCtx,
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
     _specificStats.maxTs = params.maxTs;
-    invariant(!_params.shouldTrackLatestOplogTimestamp || _params.collection->ns().isOplog());
+    invariant(!_params.shouldTrackLatestOplogTimestamp || collection()->ns().isOplog());
 
     if (params.maxTs) {
         _endConditionBSON = BSON("$gte" << *(params.maxTs));
@@ -110,14 +109,13 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 // the cursor. Also call abandonSnapshot to make sure that we are using a fresh
                 // storage engine snapshot while waiting. Otherwise, we will end up reading from the
                 // snapshot where the oplog entries are not yet visible even after the wait.
-                invariant(!_params.tailable && _params.collection->ns().isOplog());
+                invariant(!_params.tailable && collection()->ns().isOplog());
 
                 getOpCtx()->recoveryUnit()->abandonSnapshot();
-                _params.collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(
-                    getOpCtx());
+                collection()->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(getOpCtx());
             }
 
-            _cursor = _params.collection->getCursor(getOpCtx(), forward);
+            _cursor = collection()->getCursor(getOpCtx(), forward);
 
             if (!_lastSeenId.isNull()) {
                 invariant(_params.tailable);
@@ -234,13 +232,13 @@ bool CollectionScan::isEOF() {
     return _commonStats.isEOF || _isDead;
 }
 
-void CollectionScan::doSaveState() {
+void CollectionScan::doRequiresCollectionStageSaveState() {
     if (_cursor) {
         _cursor->save();
     }
 }
 
-void CollectionScan::doRestoreState() {
+void CollectionScan::doRequiresCollectionStageRestoreState() {
     if (_cursor) {
         if (!_cursor->restore()) {
             _isDead = true;

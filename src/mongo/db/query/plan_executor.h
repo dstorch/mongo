@@ -185,6 +185,7 @@ public:
     //   - On any call to restoreState().
     //   - While executing the plan inside executePlan().
     //
+    // TODO: Update comment.
     // The executor will also be automatically registered to receive notifications in the case of
     // YIELD_AUTO or YIELD_MANUAL.
     //
@@ -424,26 +425,6 @@ public:
      */
     BSONObjSet getOutputSorts() const;
 
-    /**
-     * Communicate to this PlanExecutor that it is no longer registered with the CursorManager as a
-     * 'non-cached PlanExecutor'.
-     */
-    void unsetRegistered() {
-        _registrationToken.reset();
-    }
-
-    boost::optional<Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId>
-    getRegistrationToken() const& {
-        return _registrationToken;
-    }
-    void getRegistrationToken() && = delete;
-
-    void setRegistrationToken(
-        Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId token) & {
-        invariant(!_registrationToken);
-        _registrationToken = token;
-    }
-
     bool isMarkedAsKilled() const {
         return !_killStatus.isOK();
     }
@@ -573,10 +554,6 @@ private:
     std::queue<BSONObj> _stash;
 
     enum { kUsable, kSaved, kDetached, kDisposed } _currentState = kUsable;
-
-    // Set if this PlanExecutor is registered with the CursorManager.
-    boost::optional<Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId>
-        _registrationToken;
 
     bool _everDetachedFromOperationContext = false;
 };

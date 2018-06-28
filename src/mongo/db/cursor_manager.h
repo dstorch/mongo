@@ -131,21 +131,6 @@ public:
     std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
 
     /**
-     * Register an executor so that it can be notified of deletions, invalidations, collection
-     * drops, or the like during yields. Must be called before an executor yields. Registration
-     * happens automatically for yielding PlanExecutors, so this should only be called by a
-     * PlanExecutor itself. Returns a token that must be stored for use during deregistration.
-     */
-    Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId registerExecutor(
-        PlanExecutor* exec);
-
-    /**
-     * Remove an executor from the registry. It is legal to call this even if 'exec' is not
-     * registered.
-     */
-    void deregisterExecutor(PlanExecutor* exec);
-
-    /**
      * Constructs a new ClientCursor according to the given 'cursorParams'. The cursor is atomically
      * registered with the manager and returned in pinned state.
      */

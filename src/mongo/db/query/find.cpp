@@ -279,6 +279,7 @@ Message getMore(OperationContext* opCtx,
                 !view);
         }
     } else {
+        // TODO: This block is dead code now.
         readLock.emplace(opCtx, nss);
         const int doNotChangeProfilingLevel = 0;
         statsTracker.emplace(opCtx,
@@ -294,6 +295,8 @@ Message getMore(OperationContext* opCtx,
         // This checks to make sure the operation is allowed on a replicated node.  Since we are not
         // passing in a query object (necessary to check SlaveOK query option), we allow reads
         // whether we are PRIMARY or SECONDARY.
+        //
+        // TODO: Is this check missing from the block above for globally-managed cursors?
         uassertStatusOK(
             repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, true));
     }
@@ -657,7 +660,7 @@ std::string runQuery(OperationContext* opCtx,
 
         const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         // Allocate a new ClientCursor and register it with the cursor manager.
-        ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
+        ClientCursorPin pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
             opCtx,
             {std::move(exec),
              nss,

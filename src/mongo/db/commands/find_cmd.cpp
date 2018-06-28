@@ -370,7 +370,7 @@ public:
         if (shouldSaveCursor(opCtx, collection, state, exec.get())) {
             // Create a ClientCursor containing this plan executor and register it with the cursor
             // manager.
-            ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
+            ClientCursorPin pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
                 opCtx,
                 {std::move(exec),
                  nss,

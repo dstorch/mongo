@@ -274,6 +274,7 @@ private:
 
     class AddCollectionChange;
     class RemoveCollectionChange;
+    class RenameCollectionChange;
 
     const std::string _name;  // "dbname"
 

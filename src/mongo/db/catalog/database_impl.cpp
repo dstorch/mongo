@@ -157,6 +157,35 @@ public:
     Collection* const _coll;
 };
 
+class DatabaseImpl::RenameCollectionChange final : public RecoveryUnit::Change {
+public:
+    RenameCollectionChange(DatabaseImpl* db, StringData fromNs, StringData toNs)
+        : _db(db), _fromNs(fromNs.toString()), _toNs(toNs.toString()) {}
+
+    void commit(boost::optional<Timestamp> commitTime) override {
+        // Ban reading from this collection on committed reads on snapshots before now.
+        auto it = _db->_collections.find(_toNs);
+        if (commitTime) {
+            it->second->setMinimumVisibleSnapshot(commitTime.get());
+        }
+    }
+
+    void rollback() override {
+        auto it = _db->_collections.find(_toNs);
+
+        if (it == _db->_collections.end())
+            // TODO: What's up with this case?
+            return;
+
+        _db->_collections[_fromNs] = it->second;
+        _db->_collections.erase(it);
+    }
+
+    DatabaseImpl* const _db;
+    const std::string _fromNs;
+    const std::string _toNs;
+};
+
 DatabaseImpl::~DatabaseImpl() {
     for (CollectionMap::const_iterator i = _collections.begin(); i != _collections.end(); ++i)
         delete i->second;
@@ -672,35 +701,29 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     NamespaceString fromNSS(fromNS);
     NamespaceString toNSS(toNS);
-    {  // remove anything cached
-        Collection* coll = getCollection(opCtx, fromNS);
 
-        if (!coll)
-            return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
+    Collection* coll = getCollection(opCtx, fromNS);
 
-        string clearCacheReason = str::stream() << "renamed collection '" << fromNS << "' to '"
-                                                << toNS << "'";
-        IndexCatalog::IndexIterator ii = coll->getIndexCatalog()->getIndexIterator(opCtx, true);
+    if (!coll)
+        return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
 
-        while (ii.more()) {
-            IndexDescriptor* desc = ii.next();
-            _clearCollectionCache(
-                opCtx, desc->indexNamespace(), clearCacheReason, /*collectionGoingAway*/ true);
-        }
 
-        _clearCollectionCache(opCtx, fromNS, clearCacheReason, /*collectionGoingAway*/ true);
-        _clearCollectionCache(opCtx, toNS, clearCacheReason, /*collectionGoingAway*/ false);
+    Top::get(opCtx->getServiceContext()).collectionDropped(fromNS.toString());
 
-        Top::get(opCtx->getServiceContext()).collectionDropped(fromNS.toString());
+    log() << "renameCollection: renaming collection " << coll->uuid()->toString() << " from "
+          << fromNS << " to " << toNS;
 
-        log() << "renameCollection: renaming collection " << coll->uuid()->toString() << " from "
-              << fromNS << " to " << toNS;
-    }
+    auto it = _collections.find(fromNS);
+    // TODO: Is this valid?
+    invariant(it != _collections.end());
+
+    // TODO: Should we check that 'toNs' doesn't exist?
+    _collections[toNS] = it->second;
+
+    _collections.erase(it);
 
     Status s = _dbEntry->renameCollection(opCtx, fromNS, toNS, stayTemp);
-    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, toNS));
-    _collections[toNS] = _getOrCreateCollectionInstance(opCtx, toNSS);
-
+    opCtx->recoveryUnit()->registerChange(new RenameCollectionChange(this, fromNS, toNS));
     return s;
 }
 

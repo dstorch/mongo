@@ -83,12 +83,16 @@ public:
     /**
      * Appends the sessions that have open cursors on the global cursor manager and across
      * all collection-level cursor managers to the given set of lsids.
+     *
+     * TODO: This can go away in favor of appendActiveSessions().
      */
     static void appendAllActiveSessions(OperationContext* opCtx, LogicalSessionIdSet* lsids);
 
     /**
      * Returns a list of GenericCursors for all cursors on the global cursor manager and across all
      * collection-level cursor maangers.
+     *
+     * TODO: This can go away in favor of appendActiveCursors().
      */
     static std::vector<GenericCursor> getAllCursors(OperationContext* opCtx);
 
@@ -203,12 +207,16 @@ public:
     /**
      * Deletes inactive cursors from the global cursor manager and from all per-collection cursor
      * managers. Returns the number of cursors that were timed out.
+     *
+     * TODO: We should be able to delete this thing once the global cursor id cache goes away.
      */
     static std::size_t timeoutCursorsGlobal(OperationContext* opCtx, Date_t now);
 
     /**
      * Locate the correct cursor manager for a given cursorId and execute the provided callback.
      * Returns ErrorCodes::CursorNotFound if cursorId does not exist.
+     *
+     * TODO: Make this go away. No need for it now that there's just one cursor manager.
      */
     static Status withCursorManager(OperationContext* opCtx,
                                     CursorId id,
@@ -218,10 +226,6 @@ public:
 private:
     static constexpr int kNumPartitions = 16;
     friend class ClientCursorPin;
-
-    struct PlanExecutorPartitioner {
-        std::size_t operator()(const PlanExecutor* exec, std::size_t nPartitions);
-    };
 
     CursorId allocateCursorId_inlock();
 
@@ -239,13 +243,17 @@ private:
 
     bool cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_t now);
 
+    // TODO: This method should be deleted.
     bool isGlobalManager() const {
         return _nss.isEmpty();
     }
 
     // No locks are needed to consult these data members.
+    //
+    // TODO: This data member should be deleted.
     const NamespaceString _nss;
-    const uint32_t _collectionCacheRuntimeId;
+
+    const std::unique_ptr<SecureRandom> _secureRandom;
 
     // A CursorManager holds a pointer to all open PlanExecutors and all open ClientCursors. All
     // pointers to PlanExecutors are unowned, and a PlanExecutor will notify the CursorManager when
@@ -266,10 +274,10 @@ private:
     // - If you need to access multiple partitions within '_registeredPlanExecutors' or '_cursorMap'
     //   at once, you must acquire the mutexes for those partitions in ascending order, or use the
     //   partition helpers to acquire mutexes for all partitions.
+    //
+    // TODO: This comment probably needs to be updated.
     mutable SimpleMutex _registrationLock;
     std::unique_ptr<PseudoRandom> _random;
-    Partitioned<stdx::unordered_set<PlanExecutor*>, kNumPartitions, PlanExecutorPartitioner>
-        _registeredPlanExecutors;
     std::unique_ptr<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>>
         _cursorMap;
 };

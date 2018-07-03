@@ -196,11 +196,6 @@ void DatabaseImpl::close(OperationContext* opCtx, const std::string& reason) {
 
     // Clear cache of oplog Collection pointer.
     repl::oplogCheckCloseDatabase(opCtx, this->_this);
-
-    for (auto&& pair : _collections) {
-        auto* coll = pair.second;
-        coll->getCursorManager()->invalidateAll(opCtx, true, reason);
-    }
 }
 
 Status DatabaseImpl::validateDBName(StringData dbname) {
@@ -305,7 +300,6 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
     // system.views collection would be found. Now we're sufficiently initialized, signal a version
     // change. Also force a reload, so if there are problems with the catalog contents as might be
     // caused by incorrect mongod versions or similar, they are found right away.
-    _views.invalidate();
     Status reloadStatus = _views.reloadIfNeeded(opCtx);
 
     if (!reloadStatus.isOK()) {
@@ -665,7 +659,6 @@ void DatabaseImpl::_clearCollectionCache(OperationContext* opCtx,
     // Takes ownership of the collection
     opCtx->recoveryUnit()->registerChange(new RemoveCollectionChange(this, it->second));
 
-    it->second->getCursorManager()->invalidateAll(opCtx, collectionGoingAway, reason);
     _collections.erase(it);
 }
 

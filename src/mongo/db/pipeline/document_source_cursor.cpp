@@ -260,13 +260,13 @@ void DocumentSourceCursor::cleanupExecutor() {
     // return nullptr if the collection has since turned into a view. In this case, '_exec' will
     // already have been marked as killed when the collection was dropped, and we won't need to
     // access the CursorManager to properly dispose of it.
+    //
+    // TODO: No longer necessary to hold these locks.
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     auto lockMode = getLockModeForQuery(opCtx);
     AutoGetDb dbLock(opCtx, _exec->nss().db(), lockMode);
     Lock::CollectionLock collLock(opCtx->lockState(), _exec->nss().ns(), lockMode);
-    auto collection = dbLock.getDb() ? dbLock.getDb()->getCollection(opCtx, _exec->nss()) : nullptr;
-    auto cursorManager = collection ? collection->getCursorManager() : nullptr;
-    _exec->dispose(opCtx, cursorManager);
+    _exec->dispose(opCtx, nullptr);
 
     // Not freeing _exec if we're in explain mode since it will be used in serialize() to gather
     // execution stats.
@@ -277,8 +277,7 @@ void DocumentSourceCursor::cleanupExecutor() {
 
 void DocumentSourceCursor::cleanupExecutor(const AutoGetCollectionForRead& readLock) {
     invariant(_exec);
-    auto cursorManager =
-        readLock.getCollection() ? readLock.getCollection()->getCursorManager() : nullptr;
+    auto cursorManager = nullptr;
     _exec->dispose(pExpCtx->opCtx, cursorManager);
 
     // Not freeing _exec if we're in explain mode since it will be used in serialize() to gather

@@ -200,8 +200,6 @@ public:
         virtual const RecordStore* getRecordStore() const = 0;
         virtual RecordStore* getRecordStore() = 0;
 
-        virtual CursorManager* getCursorManager() const = 0;
-
         virtual bool requiresIdIndex() const = 0;
 
         virtual Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const = 0;
@@ -395,10 +393,6 @@ public:
     }
     inline RecordStore* getRecordStore() {
         return this->_impl().getRecordStore();
-    }
-
-    inline CursorManager* getCursorManager() const {
-        return this->_impl().getCursorManager();
     }
 
     inline bool requiresIdIndex() const {

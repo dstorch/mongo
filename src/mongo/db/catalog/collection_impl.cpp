@@ -161,7 +161,6 @@ CollectionImpl::CollectionImpl(Collection* _this_init,
           parseValidationAction(_details->getCollectionOptions(opCtx).validationAction))),
       _validationLevel(uassertStatusOK(
           parseValidationLevel(_details->getCollectionOptions(opCtx).validationLevel))),
-      _cursorManager(_ns),
       _cappedNotifier(_recordStore->isCapped() ? stdx::make_unique<CappedInsertNotifier>()
                                                : nullptr),
       _this(_this_init) {}
@@ -862,7 +861,8 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
 
     // 2) drop indexes
     _indexCatalog.dropAllIndexes(opCtx, true);
-    _cursorManager.invalidateAll(opCtx, false, "collection truncated");
+    // TODO: Should queries using the collection die in the case of truncation?
+    // _cursorManager.invalidateAll(opCtx, false, "collection truncated");
 
     // 3) truncate record store
     auto status = _recordStore->truncate(opCtx);
@@ -885,7 +885,8 @@ void CollectionImpl::cappedTruncateAfter(OperationContext* opCtx, RecordId end, 
     BackgroundOperation::assertNoBgOpInProgForNs(ns());
     invariant(_indexCatalog.numIndexesInProgress(opCtx) == 0);
 
-    _cursorManager.invalidateAll(opCtx, false, "capped collection truncated");
+    // TODO: Do queries using the collection need to die in this case?
+    // _cursorManager.invalidateAll(opCtx, false, "capped collection truncated");
     _recordStore->cappedTruncateAfter(opCtx, end, inclusive);
 }
 

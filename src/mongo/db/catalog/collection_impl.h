@@ -100,10 +100,6 @@ public:
         return _recordStore;
     }
 
-    CursorManager* getCursorManager() const final {
-        return &_cursorManager;
-    }
-
     bool requiresIdIndex() const final;
 
     Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const final {
@@ -441,11 +437,6 @@ private:
 
     ValidationAction _validationAction;
     ValidationLevel _validationLevel;
-
-    // this is mutable because read only users of the Collection class
-    // use it keep state.  This seems valid as const correctness of Collection
-    // should be about the data.
-    mutable CursorManager _cursorManager;
 
     // Notifier object for awaitData. Threads polling a capped collection for new data can wait
     // on this object until notified of the arrival of new data.

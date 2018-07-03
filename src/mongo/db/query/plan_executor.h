@@ -139,6 +139,8 @@ public:
 
     /**
      * This class will ensure a PlanExecutor is disposed before it is deleted.
+     *
+     * TODO: I don't think there's any point to this class existing anymore.
      */
     class Deleter {
     public:

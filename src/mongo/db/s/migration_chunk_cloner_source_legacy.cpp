@@ -498,7 +498,7 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* opCtx,
     if (_cloneLocs.empty() && _deleteNotifyExec) {
         // We have a different OperationContext than when we created the PlanExecutor, so need to
         // manually destroy it ourselves.
-        _deleteNotifyExec->dispose(opCtx, collection->getCursorManager());
+        _deleteNotifyExec->dispose(opCtx, nullptr);
         _deleteNotifyExec.reset();
     }
 
@@ -538,13 +538,13 @@ void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* opCtx) {
     // below if statement fails
     auto deleteNotifyExec = std::move(_deleteNotifyExec);
 
+    // TODO: This whole block can probably go away.
     if (deleteNotifyExec) {
         // Don't allow an Interrupt exception to prevent _deleteNotifyExec from getting cleaned up.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
         AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
-        const auto cursorManager =
-            autoColl.getCollection() ? autoColl.getCollection()->getCursorManager() : nullptr;
+        const auto cursorManager = nullptr;
         deleteNotifyExec->dispose(opCtx, cursorManager);
     }
 }

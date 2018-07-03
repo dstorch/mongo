@@ -715,7 +715,7 @@ Timestamp PlanExecutor::getLatestOplogTimestamp() {
 //
 
 PlanExecutor::Deleter::Deleter(OperationContext* opCtx, const Collection* collection)
-    : _opCtx(opCtx), _cursorManager(collection ? collection->getCursorManager() : nullptr) {}
+    : _opCtx(opCtx), _cursorManager(nullptr) {}
 
 void PlanExecutor::Deleter::operator()(PlanExecutor* execPtr) {
     try {

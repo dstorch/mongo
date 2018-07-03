@@ -110,6 +110,10 @@ static const int INDEX_CATALOG_UNINIT = 654321;
 
 const BSONObj IndexCatalogImpl::_idObj = BSON("_id" << 1);
 
+// TODO: write comment.
+const ServiceContext::Decoration<AtomicUInt64> indexCatalogEntryGenerationCounter =
+    ServiceContext::declareDecoration<AtomicUInt64>();
+
 // -------------
 
 IndexCatalogImpl::IndexCatalogImpl(IndexCatalog* const this_,
@@ -171,12 +175,16 @@ IndexCatalogEntry* IndexCatalogImpl::_setupInMemoryStructures(
         fassertFailedNoTrace(28782);
     }
 
+    const unsigned long long generationCount =
+        indexCatalogEntryGenerationCounter(opCtx->getServiceContext()).fetchAndAdd(1ULL);
+
     auto* const descriptorPtr = descriptor.get();
     auto entry = stdx::make_unique<IndexCatalogEntry>(opCtx,
                                                       _collection->ns().ns(),
                                                       _collection->getCatalogEntry(),
                                                       std::move(descriptor),
-                                                      _collection->infoCache());
+                                                      _collection->infoCache(),
+                                                      generationCount);
     std::unique_ptr<IndexAccessMethod> accessMethod(
         _collection->dbce()->getIndex(opCtx, _collection->getCatalogEntry(), entry.get()));
     entry->init(std::move(accessMethod));
@@ -1349,6 +1357,14 @@ const IndexAccessMethod* IndexCatalogImpl::getIndex(const IndexDescriptor* desc)
 const IndexCatalogEntry* IndexCatalogImpl::getEntry(const IndexDescriptor* desc) const {
     const IndexCatalogEntry* entry = _entries.find(desc);
     massert(17357, "cannot find index entry", entry);
+    return entry;
+}
+
+const IndexCatalogEntry* IndexCatalogImpl::getEntry(const std::string& indexName) const {
+    const auto* entry = _entries.find(indexName);
+    uassert(ErrorCodes::IndexNotFound,
+            str::stream() << "cannot find index named: " << indexName,
+            entry);
     return entry;
 }
 

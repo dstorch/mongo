@@ -63,7 +63,8 @@ public:
         StringData ns,
         CollectionCatalogEntry* collection,           // not owned
         std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
-        CollectionInfoCache* infoCache);              // not owned, optional
+        CollectionInfoCache* infoCache,               // not owned, optional
+        unsigned long long generationCount);
 
     ~IndexCatalogEntryImpl() final;
 
@@ -165,6 +166,10 @@ public:
         _minVisibleSnapshot = name;
     }
 
+    unsigned long long generationCount() const final {
+        return _generationCount;
+    }
+
 private:
     class SetMultikeyChange;
     class SetHeadChange;
@@ -232,5 +237,8 @@ private:
 
     // The earliest snapshot that is allowed to read this index.
     boost::optional<Timestamp> _minVisibleSnapshot;
+
+    // TODO: write comment.
+    const unsigned long long _generationCount = 0ULL;
 };
 }  // namespace mongo

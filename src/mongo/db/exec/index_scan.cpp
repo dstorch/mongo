@@ -60,13 +60,13 @@ namespace mongo {
 const char* IndexScan::kStageType = "IXSCAN";
 
 IndexScan::IndexScan(OperationContext* opCtx,
+                     const IndexDescriptor* indexDescriptor,
                      const IndexScanParams& params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)
-    : PlanStage(kStageType, opCtx),
+    : RequiresIndexStage(kStageType, opCtx, indexDescriptor),
       _workingSet(workingSet),
-      _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
-      _keyPattern(params.descriptor->keyPattern().getOwned()),
+      _keyPattern(getIndexDescriptor()->keyPattern().getOwned()),
       _scanState(INITIALIZING),
       _filter(filter),
       _shouldDedup(true),
@@ -77,28 +77,28 @@ IndexScan::IndexScan(OperationContext* opCtx,
     // We can't always access the descriptor in the call to getStats() so we pull
     // any info we need for stats reporting out here.
     _specificStats.keyPattern = _keyPattern;
-    if (BSONElement collationElement = _params.descriptor->getInfoElement("collation")) {
+    if (BSONElement collationElement = getIndexDescriptor()->getInfoElement("collation")) {
         invariant(collationElement.isABSONObj());
         _specificStats.collation = collationElement.Obj().getOwned();
     }
-    _specificStats.indexName = _params.descriptor->indexName();
-    _specificStats.isMultiKey = _params.descriptor->isMultikey(getOpCtx());
-    _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(getOpCtx());
-    _specificStats.isUnique = _params.descriptor->unique();
-    _specificStats.isSparse = _params.descriptor->isSparse();
-    _specificStats.isPartial = _params.descriptor->isPartial();
-    _specificStats.indexVersion = static_cast<int>(_params.descriptor->version());
+    _specificStats.indexName = getIndexDescriptor()->indexName();
+    _specificStats.isMultiKey = getIndexDescriptor()->isMultikey(getOpCtx());
+    _specificStats.multiKeyPaths = getIndexDescriptor()->getMultikeyPaths(getOpCtx());
+    _specificStats.isUnique = getIndexDescriptor()->unique();
+    _specificStats.isSparse = getIndexDescriptor()->isSparse();
+    _specificStats.isPartial = getIndexDescriptor()->isPartial();
+    _specificStats.indexVersion = static_cast<int>(getIndexDescriptor()->version());
 }
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
     if (_params.doNotDedup) {
         _shouldDedup = false;
     } else {
-        _shouldDedup = _params.descriptor->isMultikey(getOpCtx());
+        _shouldDedup = getIndexDescriptor()->isMultikey(getOpCtx());
     }
 
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
-    _indexCursor = _iam->newCursor(getOpCtx(), _forward);
+    _indexCursor = getIndexAccessMethod()->newCursor(getOpCtx(), _forward);
 
     // We always seek once to establish the cursor position.
     ++_specificStats.seeks;
@@ -155,7 +155,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         // In debug mode, check that the cursor isn't lying to us.
         if (kDebugBuild && !_startKey.isEmpty()) {
             int cmp = kv->key.woCompare(_startKey,
-                                        Ordering::make(_params.descriptor->keyPattern()),
+                                        Ordering::make(getIndexDescriptor()->keyPattern()),
                                         /*compareFieldNames*/ false);
             if (cmp == 0)
                 dassert(_startKeyInclusive);
@@ -164,7 +164,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
 
         if (kDebugBuild && !_endKey.isEmpty()) {
             int cmp = kv->key.woCompare(_endKey,
-                                        Ordering::make(_params.descriptor->keyPattern()),
+                                        Ordering::make(getIndexDescriptor()->keyPattern()),
                                         /*compareFieldNames*/ false);
             if (cmp == 0)
                 dassert(_endKeyInclusive);
@@ -220,7 +220,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
     member->recordId = kv->loc;
-    member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, _iam));
+    member->keyData.push_back(IndexKeyDatum(_keyPattern, kv->key, getIndexAccessMethod()));
     _workingSet->transitionToRecordIdAndIdx(id);
 
     if (_params.addKeyMetadata) {
@@ -237,7 +237,7 @@ bool IndexScan::isEOF() {
     return _commonStats.isEOF;
 }
 
-void IndexScan::doSaveState() {
+void IndexScan::doRequiresIndexStageSaveState() {
     if (!_indexCursor)
         return;
 
@@ -249,7 +249,7 @@ void IndexScan::doSaveState() {
     _indexCursor->save();
 }
 
-void IndexScan::doRestoreState() {
+void IndexScan::doRequiresIndexStageRestoreState() {
     if (_indexCursor)
         _indexCursor->restore();
 }

@@ -46,13 +46,15 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* opCtx,
                                      StringData ns,
                                      CollectionCatalogEntry* collection,
                                      std::unique_ptr<IndexDescriptor> descriptor,
-                                     CollectionInfoCache* infoCache)
+                                     CollectionInfoCache* infoCache,
+                                     unsigned long long generationCount)
     : _pimpl(makeImpl(this,
                       opCtx,
                       ns,
                       collection,
                       std::move(descriptor),
                       infoCache,
+                      generationCount,
                       PrivateCall<IndexCatalogEntry>{})) {}
 
 void IndexCatalogEntry::init(std::unique_ptr<IndexAccessMethod> accessMethod) {
@@ -80,6 +82,14 @@ IndexCatalogEntry* IndexCatalogEntryContainer::find(const IndexDescriptor* desc)
     for (iterator i = begin(); i != end(); ++i) {
         IndexCatalogEntry* e = i->get();
         if (e->descriptor() == desc)
+            return e;
+    }
+    return nullptr;
+}
+const IndexCatalogEntry* IndexCatalogEntryContainer::find(const std::string& name) const {
+    for (iterator i = begin(); i != end(); ++i) {
+        IndexCatalogEntry* e = i->get();
+        if (e->descriptor()->indexName() == name)
             return e;
     }
     return nullptr;

@@ -109,10 +109,10 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* opCtx,
             0, term, _params.indexPrefix, _params.spec.getTextIndexVersion());
         ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         ixparams.bounds.isSimpleRange = true;
-        ixparams.descriptor = _params.index;
         ixparams.direction = -1;
 
-        indexScanList.push_back(stdx::make_unique<IndexScan>(opCtx, ixparams, ws, nullptr));
+        indexScanList.push_back(
+            stdx::make_unique<IndexScan>(opCtx, _params.index, ixparams, ws, nullptr));
     }
 
     // Build the union of the index scans as a TEXT_OR or an OR stage, depending on whether the

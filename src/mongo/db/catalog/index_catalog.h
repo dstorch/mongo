@@ -201,6 +201,11 @@ public:
 
         virtual const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const = 0;
 
+        /**
+         * TODO: Write comment. Need to specify that this throws when the index is not found.
+         */
+        virtual const IndexCatalogEntry* getEntry(const std::string& indexName) const = 0;
+
         virtual IndexAccessMethod* getIndex(const IndexDescriptor* desc) = 0;
 
         virtual const IndexAccessMethod* getIndex(const IndexDescriptor* desc) const = 0;
@@ -413,6 +418,10 @@ public:
     // never returns NULL
     const IndexCatalogEntry* getEntry(const IndexDescriptor* const desc) const {
         return this->_impl().getEntry(desc);
+    }
+
+    const IndexCatalogEntry* getEntry(const std::string& indexName) const {
+        return this->_impl().getEntry(indexName);
     }
 
     inline IndexAccessMethod* getIndex(const IndexDescriptor* const desc) {

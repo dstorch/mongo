@@ -95,6 +95,8 @@ namespace mongo {
  *
  * TODO: Right now the interface allows the nextCovering() to be adaptive, but doesn't allow
  * aborting and shrinking a covered range being buffered if we guess wrong.
+ *
+ * TODO: Make this a "requires collection" stage.
  */
 class NearStage : public PlanStage {
 public:

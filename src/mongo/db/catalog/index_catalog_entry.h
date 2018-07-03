@@ -101,6 +101,8 @@ public:
         virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() = 0;
 
         virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
+
+        virtual unsigned long long generationCount() const = 0;
     };
 
 public:
@@ -110,6 +112,7 @@ public:
                                CollectionCatalogEntry* collection,
                                std::unique_ptr<IndexDescriptor> descriptor,
                                CollectionInfoCache* infoCache,
+                               unsigned long long generationCount,
                                PrivateTo<IndexCatalogEntry>)
                                   ->std::unique_ptr<Impl>) makeImpl;
 
@@ -118,7 +121,8 @@ public:
         StringData ns,
         CollectionCatalogEntry* collection,           // not owned
         std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
-        CollectionInfoCache* infoCache);              // not owned, optional
+        CollectionInfoCache* infoCache,               // not owned, optional
+        unsigned long long generationCount);
 
     // Do not call this function.  It exists for use with test drivers that need to inject
     // alternative implementations.
@@ -201,6 +205,13 @@ public:
      */
     inline MultikeyPaths getMultikeyPaths(OperationContext* const opCtx) const {
         return this->_impl().getMultikeyPaths(opCtx);
+    }
+
+    /**
+     * TODO: write comment.
+     */
+    inline unsigned long long generationCount() const {
+        return this->_impl().generationCount();
     }
 
     /**
@@ -295,6 +306,8 @@ public:
     const IndexCatalogEntry* find(const IndexDescriptor* desc) const;
     IndexCatalogEntry* find(const IndexDescriptor* desc);
 
+    // TODO: Is iterating the list of index entries fast enough?
+    const IndexCatalogEntry* find(const std::string& name) const;
     IndexCatalogEntry* find(const std::string& name);
 
 

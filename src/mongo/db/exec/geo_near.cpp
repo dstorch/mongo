@@ -315,7 +315,6 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* opCtx,
                                                       WorkingSet* workingSet,
                                                       Collection* collection) {
     IndexScanParams scanParams;
-    scanParams.descriptor = _twoDIndex;
     scanParams.direction = 1;
     scanParams.doNotDedup = true;
 
@@ -351,7 +350,7 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* opCtx,
     IndexBoundsBuilder::intersectize(oil, &scanParams.bounds.fields[twoDFieldPosition]);
 
     invariant(!_indexScan);
-    _indexScan = new IndexScan(opCtx, scanParams, workingSet, NULL);
+    _indexScan = new IndexScan(opCtx, _twoDIndex, scanParams, workingSet, NULL);
     _children->emplace_back(_indexScan);
 }
 
@@ -689,7 +688,6 @@ StatusWith<NearStage::CoveredInterval*>  //
     //
 
     IndexScanParams scanParams;
-    scanParams.descriptor = _twoDIndex;
     scanParams.direction = 1;
 
     // This does force us to do our own deduping of results.
@@ -731,7 +729,7 @@ StatusWith<NearStage::CoveredInterval*>  //
     GeoHashConverter::parseParameters(_twoDIndex->infoObj(), &hashParams).transitional_ignore();
 
     // 2D indexes support covered search over additional fields they contain
-    IndexScan* scan = new IndexScan(opCtx, scanParams, workingSet, _nearParams.filter);
+    IndexScan* scan = new IndexScan(opCtx, _twoDIndex, scanParams, workingSet, _nearParams.filter);
 
     MatchExpression* docMatcher = nullptr;
 
@@ -890,7 +888,6 @@ void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(OperationContext* op
                                                             WorkingSet* workingSet,
                                                             Collection* collection) {
     IndexScanParams scanParams;
-    scanParams.descriptor = _s2Index;
     scanParams.direction = 1;
     scanParams.doNotDedup = true;
     scanParams.bounds = _nearParams->baseBounds;
@@ -915,7 +912,7 @@ void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(OperationContext* op
 
     // Index scan
     invariant(!_indexScan);
-    _indexScan = new IndexScan(opCtx, scanParams, workingSet, NULL);
+    _indexScan = new IndexScan(opCtx, _s2Index, scanParams, workingSet, NULL);
     _children->emplace_back(_indexScan);
 }
 
@@ -1065,7 +1062,6 @@ StatusWith<NearStage::CoveredInterval*>  //
     //
 
     IndexScanParams scanParams;
-    scanParams.descriptor = _s2Index;
     scanParams.direction = 1;
 
     // This does force us to do our own deduping of results.
@@ -1099,7 +1095,7 @@ StatusWith<NearStage::CoveredInterval*>  //
     OrderedIntervalList* coveredIntervals = &scanParams.bounds.fields[s2FieldPosition];
     ExpressionMapping::S2CellIdsToIntervalsWithParents(cover, _indexParams, coveredIntervals);
 
-    IndexScan* scan = new IndexScan(opCtx, scanParams, workingSet, nullptr);
+    IndexScan* scan = new IndexScan(opCtx, _s2Index, scanParams, workingSet, nullptr);
 
     // FetchStage owns index scan
     _children.emplace_back(new FetchStage(opCtx, workingSet, scan, _nearParams.filter, collection));

@@ -164,6 +164,8 @@ public:
     // never returns NULL
     const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const override;
 
+    const IndexCatalogEntry* getEntry(const std::string& indexName) const override;
+
     IndexAccessMethod* getIndex(const IndexDescriptor* desc) override;
     const IndexAccessMethod* getIndex(const IndexDescriptor* desc) const override;
 

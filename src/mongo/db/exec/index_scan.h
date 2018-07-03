@@ -29,7 +29,7 @@
 #pragma once
 
 
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/requires_index_stage.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -46,9 +46,7 @@ class IndexDescriptor;
 class WorkingSet;
 
 struct IndexScanParams {
-    IndexScanParams() : descriptor(NULL), direction(1), doNotDedup(false), addKeyMetadata(false) {}
-
-    const IndexDescriptor* descriptor;
+    IndexScanParams() : direction(1), doNotDedup(false), addKeyMetadata(false) {}
 
     IndexBounds bounds;
 
@@ -66,7 +64,7 @@ struct IndexScanParams {
  *
  * Sub-stage preconditions: None.  Is a leaf and consumes no stage data.
  */
-class IndexScan final : public PlanStage {
+class IndexScan final : public RequiresIndexStage {
 public:
     /**
      * Keeps track of what this index scan is currently doing so that it
@@ -87,14 +85,15 @@ public:
     };
 
     IndexScan(OperationContext* opCtx,
+              const IndexDescriptor* indexDescriptor,
               const IndexScanParams& params,
               WorkingSet* workingSet,
               const MatchExpression* filter);
 
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
-    void doSaveState() final;
-    void doRestoreState() final;
+    void doRequiresIndexStageSaveState() final;
+    void doRequiresIndexStageRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
 
@@ -118,7 +117,6 @@ private:
     WorkingSet* const _workingSet;
 
     // Index access.
-    const IndexAccessMethod* const _iam;  // owned by Collection -> IndexCatalog
     std::unique_ptr<SortedDataInterface::Cursor> _indexCursor;
     const BSONObj _keyPattern;
 

@@ -204,14 +204,14 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(OperationContext* opCtx,
     invariant(descriptor);
 
     IndexScanParams params;
-    params.descriptor = descriptor;
     params.direction = direction;
     params.bounds.isSimpleRange = true;
     params.bounds.startKey = startKey;
     params.bounds.endKey = endKey;
     params.bounds.boundInclusion = boundInclusion;
 
-    std::unique_ptr<PlanStage> root = stdx::make_unique<IndexScan>(opCtx, params, ws, nullptr);
+    std::unique_ptr<PlanStage> root =
+        stdx::make_unique<IndexScan>(opCtx, descriptor, params, ws, nullptr);
 
     if (InternalPlanner::IXSCAN_FETCH & options) {
         root = stdx::make_unique<FetchStage>(opCtx, ws, root.release(), nullptr, collection);

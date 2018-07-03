@@ -301,7 +301,6 @@ public:
             }
 
             IndexScanParams params;
-            params.descriptor = desc;
             params.bounds.isSimpleRange = true;
             params.bounds.startKey = stripFieldNames(nodeArgs["startKey"].Obj());
             params.bounds.endKey = stripFieldNames(nodeArgs["endKey"].Obj());
@@ -309,7 +308,7 @@ public:
                 nodeArgs["startKeyInclusive"].Bool(), nodeArgs["endKeyInclusive"].Bool());
             params.direction = nodeArgs["direction"].numberInt();
 
-            return new IndexScan(opCtx, params, workingSet, matcher);
+            return new IndexScan(opCtx, desc, params, workingSet, matcher);
         } else if ("andHash" == nodeName) {
             uassert(
                 16921, "Nodes argument must be provided to AND", nodeArgs["nodes"].isABSONObj());

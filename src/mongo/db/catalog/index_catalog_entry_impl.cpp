@@ -61,10 +61,11 @@ MONGO_REGISTER_SHIM(IndexCatalogEntry::makeImpl)
  CollectionCatalogEntry* const collection,
  std::unique_ptr<IndexDescriptor> descriptor,
  CollectionInfoCache* const infoCache,
+ unsigned long long generationCount,
  PrivateTo<IndexCatalogEntry>)
     ->std::unique_ptr<IndexCatalogEntry::Impl> {
     return std::make_unique<IndexCatalogEntryImpl>(
-        this_, opCtx, ns, collection, std::move(descriptor), infoCache);
+        this_, opCtx, ns, collection, std::move(descriptor), infoCache, generationCount);
 }
 
 using std::string;
@@ -92,7 +93,8 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
                                              const StringData ns,
                                              CollectionCatalogEntry* const collection,
                                              std::unique_ptr<IndexDescriptor> descriptor,
-                                             CollectionInfoCache* const infoCache)
+                                             CollectionInfoCache* const infoCache,
+                                             unsigned long long generationCount)
     : _ns(ns.toString()),
       _collection(collection),
       _descriptor(std::move(descriptor)),
@@ -100,7 +102,8 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
       _headManager(stdx::make_unique<HeadManagerImpl>(this_)),
       _ordering(Ordering::make(_descriptor->keyPattern())),
       _isReady(false),
-      _prefix(collection->getIndexPrefix(opCtx, _descriptor->indexName())) {
+      _prefix(collection->getIndexPrefix(opCtx, _descriptor->indexName())),
+      _generationCount(generationCount) {
     _descriptor->_cachedEntry = this_;
 
     _isReady = _catalogIsReady(opCtx);

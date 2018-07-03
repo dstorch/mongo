@@ -94,14 +94,14 @@ PlanStage* buildStages(OperationContext* opCtx,
 
             IndexScanParams params;
 
-            params.descriptor =
+            auto* descriptor =
                 collection->getIndexCatalog()->findIndexByName(opCtx, ixn->index.name);
-            invariant(params.descriptor);
+            invariant(descriptor);
 
             params.bounds = ixn->bounds;
             params.direction = ixn->direction;
             params.addKeyMetadata = ixn->addKeyMetadata;
-            return new IndexScan(opCtx, params, ws, ixn->filter.get());
+            return new IndexScan(opCtx, descriptor, params, ws, ixn->filter.get());
         }
         case STAGE_FETCH: {
             const FetchNode* fn = static_cast<const FetchNode*>(root);

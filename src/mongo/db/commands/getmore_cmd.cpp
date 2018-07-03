@@ -262,6 +262,17 @@ public:
 
         ClientCursor* cursor = ccPin.getValue().getCursor();
 
+        if (cursor->getExecutor()->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally) {
+            // We need to hold locks in order to run this PlanExecutor.
+            readLock.emplace(opCtx, request.nss);
+            const int doNotChangeProfilingLevel = 0;
+            statsTracker.emplace(opCtx,
+                                 request.nss,
+                                 Top::LockType::ReadLocked,
+                                 readLock->getDb() ? readLock->getDb()->getProfilingLevel()
+                                                   : doNotChangeProfilingLevel);
+        }
+
         // Only used by the failpoints.
         const auto dropAndReaquireReadLock = [&readLock, opCtx, &request]() {
             // Make sure an interrupted operation does not prevent us from reacquiring the lock.

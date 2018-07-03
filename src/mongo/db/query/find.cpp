@@ -254,52 +254,32 @@ Message getMore(OperationContext* opCtx,
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     boost::optional<AutoGetCollectionForRead> readLock;
     boost::optional<AutoStatsTracker> statsTracker;
-    CursorManager* cursorManager;
+    CursorManager* cursorManager = CursorManager::getGlobalCursorManager();
 
-    if (CursorManager::isGloballyManagedCursor(cursorid)) {
-        cursorManager = CursorManager::getGlobalCursorManager();
-
-        if (boost::optional<NamespaceString> nssForCurOp = nss.isGloballyManagedNamespace()
-                ? nss.getTargetNSForGloballyManagedNamespace()
-                : nss) {
-            AutoGetDb autoDb(opCtx, nssForCurOp->db(), MODE_IS);
-            const auto profilingLevel = autoDb.getDb()
-                ? boost::optional<int>{autoDb.getDb()->getProfilingLevel()}
-                : boost::none;
-            statsTracker.emplace(opCtx, *nssForCurOp, Top::LockType::NotLocked, profilingLevel);
-            auto view = autoDb.getDb()
-                ? autoDb.getDb()->getViewCatalog()->lookup(opCtx, nssForCurOp->ns())
-                : nullptr;
-            uassert(
-                ErrorCodes::CommandNotSupportedOnView,
+    if (boost::optional<NamespaceString> nssForCurOp =
+            nss.isGloballyManagedNamespace() ? nss.getTargetNSForGloballyManagedNamespace() : nss) {
+        AutoGetDb autoDb(opCtx, nssForCurOp->db(), MODE_IS);
+        const auto profilingLevel = autoDb.getDb()
+            ? boost::optional<int>{autoDb.getDb()->getProfilingLevel()}
+            : boost::none;
+        statsTracker.emplace(opCtx, *nssForCurOp, Top::LockType::NotLocked, profilingLevel);
+        auto view = autoDb.getDb()
+            ? autoDb.getDb()->getViewCatalog()->lookup(opCtx, nssForCurOp->ns())
+            : nullptr;
+        uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "Namespace " << nssForCurOp->ns()
                               << " is a view. OP_GET_MORE operations are not supported on views. "
                               << "Only clients which support the getMore command can be used to "
                                  "query views.",
                 !view);
-        }
-    } else {
-        // TODO: This block is dead code now.
-        readLock.emplace(opCtx, nss);
-        const int doNotChangeProfilingLevel = 0;
-        statsTracker.emplace(opCtx,
-                             nss,
-                             Top::LockType::ReadLocked,
-                             readLock->getDb() ? readLock->getDb()->getProfilingLevel()
-                                               : doNotChangeProfilingLevel);
-        Collection* collection = readLock->getCollection();
-        uassert(
-            ErrorCodes::OperationFailed, "collection dropped between getMore calls", collection);
-        cursorManager = collection->getCursorManager();
-
-        // This checks to make sure the operation is allowed on a replicated node.  Since we are not
-        // passing in a query object (necessary to check SlaveOK query option), we allow reads
-        // whether we are PRIMARY or SECONDARY.
-        //
-        // TODO: Is this check missing from the block above for globally-managed cursors?
-        uassertStatusOK(
-            repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, true));
     }
+    // This checks to make sure the operation is allowed on a replicated node.  Since we are not
+    // passing in a query object (necessary to check SlaveOK query option), we allow reads
+    // whether we are PRIMARY or SECONDARY.
+    //
+    // TODO: Was this check missing in the globally managed cursor case?
+    /* uassertStatusOK( */
+    /*     repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, true)); */
 
     LOG(5) << "Running getMore, cursorid: " << cursorid;
 
@@ -454,11 +434,13 @@ Message getMore(OperationContext* opCtx,
         // the original request and subsequent getMore. It would be useful to have this information
         // for an aggregation, but the source PlanExecutor could be destroyed before we know whether
         // we need execStats and we do not want to generate for all operations due to cost.
-        if (!CursorManager::isGloballyManagedCursor(cursorid) && curOp.shouldDBProfile()) {
-            BSONObjBuilder execStatsBob;
-            Explain::getWinningPlanStats(exec, &execStatsBob);
-            curOp.debug().execStats = execStatsBob.obj();
-        }
+        //
+        // TODO: We'll need a different way to check for the existence of the PlanExecutor.
+        /* if (!CursorManager::isGloballyManagedCursor(cursorid) && curOp.shouldDBProfile()) { */
+        /*     BSONObjBuilder execStatsBob; */
+        /*     Explain::getWinningPlanStats(exec, &execStatsBob); */
+        /*     curOp.debug().execStats = execStatsBob.obj(); */
+        /* } */
 
         // Our two possible ClientCursorPin cleanup paths are:
         // 1) If the cursor is not going to be saved, we call deleteUnderlying() on the pin.

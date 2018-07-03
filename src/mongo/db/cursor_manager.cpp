@@ -64,19 +64,6 @@ using std::vector;
 constexpr int CursorManager::kNumPartitions;
 
 namespace {
-uint32_t idFromCursorId(CursorId id) {
-    uint64_t x = static_cast<uint64_t>(id);
-    x = x >> 32;
-    return static_cast<uint32_t>(x);
-}
-
-CursorId cursorIdFromParts(uint32_t collectionIdentifier, uint32_t cursor) {
-    // The leading two bits of a non-global CursorId should be 0.
-    invariant((collectionIdentifier & (0b11 << 30)) == 0);
-    CursorId x = static_cast<CursorId>(collectionIdentifier) << 32;
-    x |= cursor;
-    return x;
-}
 
 class GlobalCursorIdCache {
 public:
@@ -180,27 +167,14 @@ void GlobalCursorIdCache::deregisterCursorManager(uint32_t id, const NamespaceSt
 
 bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool checkAuth) {
     // Figure out what the namespace of this cursor is.
-    NamespaceString nss;
-    if (CursorManager::isGloballyManagedCursor(id)) {
-        auto pin = globalCursorManager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
-        if (!pin.isOK()) {
-            invariant(pin == ErrorCodes::CursorNotFound || pin == ErrorCodes::Unauthorized);
-            // No such cursor.  TODO: Consider writing to audit log here (even though we don't
-            // have a namespace).
-            return false;
-        }
-        nss = pin.getValue().getCursor()->nss();
-    } else {
-        stdx::lock_guard<SimpleMutex> lk(_mutex);
-        uint32_t nsid = idFromCursorId(id);
-        IdToNssMap::const_iterator it = _idToNss.find(nsid);
-        if (it == _idToNss.end()) {
-            // No namespace corresponding to this cursor id prefix.  TODO: Consider writing to
-            // audit log here (even though we don't have a namespace).
-            return false;
-        }
-        nss = it->second;
+    auto pin = globalCursorManager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
+    if (!pin.isOK()) {
+        invariant(pin == ErrorCodes::CursorNotFound || pin == ErrorCodes::Unauthorized);
+        // No such cursor.  TODO: Consider writing to audit log here (even though we don't
+        // have a namespace).
+        return false;
     }
+    NamespaceString nss = pin.getValue().getCursor()->nss();
     invariant(nss.isValid());
 
     // Check if we are authorized to kill this cursor.
@@ -221,33 +195,11 @@ bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool 
         }
     }
 
-    // If this cursor is owned by the global cursor manager, ask it to kill the cursor for us.
-    if (CursorManager::isGloballyManagedCursor(id)) {
-        Status killStatus = globalCursorManager->killCursor(opCtx, id, checkAuth);
-        massert(28697,
-                killStatus.reason(),
-                killStatus.code() == ErrorCodes::OK ||
-                    killStatus.code() == ErrorCodes::CursorNotFound);
-        return killStatus.isOK();
-    }
-
-    // If not, then the cursor must be owned by a collection. Kill the cursor under the
-    // collection lock (to prevent the collection from going away during the erase).
-    AutoGetCollectionForReadCommand ctx(opCtx, nss);
-    Collection* collection = ctx.getCollection();
-    if (!collection) {
-        if (checkAuth)
-            audit::logKillCursorsAuthzCheck(
-                opCtx->getClient(), nss, id, ErrorCodes::CursorNotFound);
-        return false;
-    }
-
-    Status eraseStatus = collection->getCursorManager()->killCursor(opCtx, id, checkAuth);
-    uassert(16089,
-            eraseStatus.reason(),
-            eraseStatus.code() == ErrorCodes::OK ||
-                eraseStatus.code() == ErrorCodes::CursorNotFound);
-    return eraseStatus.isOK();
+    Status killStatus = globalCursorManager->killCursor(opCtx, id, checkAuth);
+    massert(28697,
+            killStatus.reason(),
+            killStatus.code() == ErrorCodes::OK || killStatus.code() == ErrorCodes::CursorNotFound);
+    return killStatus.isOK();
 }
 
 std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t now) {
@@ -387,22 +339,7 @@ Status CursorManager::withCursorManager(OperationContext* opCtx,
                                         CursorId id,
                                         const NamespaceString& nss,
                                         stdx::function<Status(CursorManager*)> callback) {
-    boost::optional<AutoGetCollectionForReadCommand> readLock;
-    CursorManager* cursorManager = nullptr;
-
-    if (CursorManager::isGloballyManagedCursor(id)) {
-        cursorManager = CursorManager::getGlobalCursorManager();
-    } else {
-        readLock.emplace(opCtx, nss);
-        Collection* collection = readLock->getCollection();
-        if (!collection) {
-            return {ErrorCodes::CursorNotFound,
-                    str::stream() << "collection does not exist: " << nss.ns()};
-        }
-        cursorManager = collection->getCursorManager();
-    }
-    invariant(cursorManager);
-
+    CursorManager* cursorManager = CursorManager::getGlobalCursorManager();
     return callback(cursorManager);
 }
 
@@ -617,21 +554,11 @@ size_t CursorManager::numCursors() const {
 
 CursorId CursorManager::allocateCursorId_inlock() {
     for (int i = 0; i < 10000; i++) {
-        // The leading two bits of a CursorId are used to determine if the cursor is registered on
-        // the global cursor manager.
-        CursorId id;
-        if (isGlobalManager()) {
-            // This is the global cursor manager, so generate a random number and make sure the
-            // first two bits are 01.
-            uint64_t mask = 0x3FFFFFFFFFFFFFFF;
-            uint64_t bitToSet = 1ULL << 62;
-            id = ((_random->nextInt64() & mask) | bitToSet);
-        } else {
-            // The first 2 bits are 0, the next 30 bits are the collection identifier, the next 32
-            // bits are random.
-            uint32_t myPart = static_cast<uint32_t>(_random->nextInt32());
-            id = cursorIdFromParts(_collectionCacheRuntimeId, myPart);
-        }
+        // Generate a random number to act as the new cursor id. Make sure the first bit is 0, since
+        // this number will be reinterpreted as a 64 bit signed number.
+        uint64_t mask = 0x7FFFFFFFFFFFFFFF;
+        CursorId id = (_random->nextInt64() & mask);
+
         auto partition = _cursorMap->lockOnePartition(id);
         if (partition->count(id) == 0)
             return id;

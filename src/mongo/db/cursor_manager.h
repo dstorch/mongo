@@ -194,17 +194,6 @@ public:
 
     static CursorManager* getGlobalCursorManager();
 
-    /**
-     * Returns true if this CursorId would be registered with the global CursorManager. Note that if
-     * this method returns true it does not imply the cursor exists.
-     */
-    static bool isGloballyManagedCursor(CursorId cursorId) {
-        // The first two bits are 01 for globally managed cursors, and 00 for cursors owned by a
-        // collection. The leading bit is always 0 so that CursorIds do not appear as negative.
-        const long long mask = static_cast<long long>(0b11) << 62;
-        return (cursorId & mask) == (static_cast<long long>(0b01) << 62);
-    }
-
     static int killCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* ids);
 
     static bool killCursorGlobalIfAuthorized(OperationContext* opCtx, CursorId id);

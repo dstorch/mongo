@@ -248,33 +248,13 @@ public:
         // cursor cleanup can occur under the lock.
         boost::optional<AutoGetCollectionForRead> readLock;
         boost::optional<AutoStatsTracker> statsTracker;
-        CursorManager* cursorManager;
+        CursorManager* cursorManager = CursorManager::getGlobalCursorManager();
 
-        if (CursorManager::isGloballyManagedCursor(request.cursorid)) {
-            cursorManager = CursorManager::getGlobalCursorManager();
-
-            if (boost::optional<NamespaceString> nssForCurOp =
-                    request.nss.isGloballyManagedNamespace()
-                    ? request.nss.getTargetNSForGloballyManagedNamespace()
-                    : request.nss) {
-                const boost::optional<int> dbProfilingLevel = boost::none;
-                statsTracker.emplace(
-                    opCtx, *nssForCurOp, Top::LockType::NotLocked, dbProfilingLevel);
-            }
-        } else {
-            readLock.emplace(opCtx, request.nss);
-            const int doNotChangeProfilingLevel = 0;
-            statsTracker.emplace(opCtx,
-                                 request.nss,
-                                 Top::LockType::ReadLocked,
-                                 readLock->getDb() ? readLock->getDb()->getProfilingLevel()
-                                                   : doNotChangeProfilingLevel);
-
-            Collection* collection = readLock->getCollection();
-            if (!collection) {
-                uasserted(ErrorCodes::OperationFailed, "collection dropped between getMore calls");
-            }
-            cursorManager = collection->getCursorManager();
+        if (boost::optional<NamespaceString> nssForCurOp = request.nss.isGloballyManagedNamespace()
+                ? request.nss.getTargetNSForGloballyManagedNamespace()
+                : request.nss) {
+            const boost::optional<int> dbProfilingLevel = boost::none;
+            statsTracker.emplace(opCtx, *nssForCurOp, Top::LockType::NotLocked, dbProfilingLevel);
         }
 
         auto ccPin = cursorManager->pinCursor(opCtx, request.cursorid);
@@ -436,11 +416,14 @@ public:
         // the original request and subsequent getMore. It would be useful to have this information
         // for an aggregation, but the source PlanExecutor could be destroyed before we know whether
         // we need execStats and we do not want to generate for all operations due to cost.
-        if (!CursorManager::isGloballyManagedCursor(request.cursorid) && curOp->shouldDBProfile()) {
-            BSONObjBuilder execStatsBob;
-            Explain::getWinningPlanStats(exec, &execStatsBob);
-            curOp->debug().execStats = execStatsBob.obj();
-        }
+        //
+        // TODO: We'll need a different way to check for the existence of the PlanExecutor.
+        /* if (!CursorManager::isGloballyManagedCursor(request.cursorid) &&
+         * curOp->shouldDBProfile()) { */
+        /*     BSONObjBuilder execStatsBob; */
+        /*     Explain::getWinningPlanStats(exec, &execStatsBob); */
+        /*     curOp->debug().execStats = execStatsBob.obj(); */
+        /* } */
 
         if (shouldSaveCursorGetMore(state, exec, cursor->isTailable())) {
             respondWithId = request.cursorid;

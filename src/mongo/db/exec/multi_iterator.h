@@ -32,8 +32,8 @@
 #include <vector>
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
@@ -45,7 +45,7 @@ namespace mongo {
  * special commands that work with RecordCursors. For example, it is used by the
  * parallelCollectionScan and repairCursor commands
  */
-class MultiIteratorStage final : public PlanStage {
+class MultiIteratorStage final : public RequiresCollectionStage {
 public:
     MultiIteratorStage(OperationContext* opCtx, WorkingSet* ws, Collection* collection);
 
@@ -55,10 +55,8 @@ public:
 
     bool isEOF() final;
 
-    void kill();
-
-    void doSaveState() final;
-    void doRestoreState() final;
+    void doRequiresCollectionStageSaveState() final;
+    void doRequiresCollectionStageRestoreState() final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext() final;
 
@@ -78,8 +76,7 @@ public:
     static const char* kStageType;
 
 private:
-    OperationContext* _opCtx;
-    Collection* _collection;
+    bool _isDead = false;
     std::vector<std::unique_ptr<RecordCursor>> _iterators;
 
     // Not owned by us.

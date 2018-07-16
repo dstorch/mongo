@@ -53,7 +53,7 @@ void RequiresIndexStage::doRequiresCollectionStageRestoreState() {
     // then it's generation count will not match ours.
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "Index named '" << _indexName << "' was dropped and recreated",
-            _generationCount == _indexCatalogEntry->generationCount());
+            _indexMinimumVisibleSnapshot == *_indexCatalogEntry->getMinimumVisibleSnapshot());
 
     _indexDescriptor = _indexCatalogEntry->descriptor();
     _indexAccessMethod = _indexCatalogEntry->accessMethod();

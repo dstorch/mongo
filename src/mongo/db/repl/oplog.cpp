@@ -444,6 +444,11 @@ OpTime logOp(OperationContext* opCtx,
                 str::stream() << "retryable writes is not supported for unreplicated ns: "
                               << nss.ns(),
                 statementId == kUninitializedStmtId);
+        // TODO: Verify that this approach is safe. I think the effect here will be to timestamp
+        // writes on standalones.  Is that ok? In any case, this special handling would go away if
+        // we made it so that standalones have oplogs.
+        auto ts = LogicalClock::get(opCtx)->reserveTicks(1u).asTimestamp();
+        uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(ts));
         return {};
     }
 

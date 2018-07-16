@@ -98,11 +98,9 @@ public:
 
         virtual KVPrefix getPrefix() const = 0;
 
-        virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() = 0;
+        virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() const = 0;
 
         virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
-
-        virtual unsigned long long generationCount() const = 0;
     };
 
 public:
@@ -112,7 +110,6 @@ public:
                                CollectionCatalogEntry* collection,
                                std::unique_ptr<IndexDescriptor> descriptor,
                                CollectionInfoCache* infoCache,
-                               unsigned long long generationCount,
                                PrivateTo<IndexCatalogEntry>)
                                   ->std::unique_ptr<Impl>) makeImpl;
 
@@ -121,8 +118,7 @@ public:
         StringData ns,
         CollectionCatalogEntry* collection,           // not owned
         std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
-        CollectionInfoCache* infoCache,               // not owned, optional
-        unsigned long long generationCount);
+        CollectionInfoCache* infoCache);              // not owned, optional
 
     // Do not call this function.  It exists for use with test drivers that need to inject
     // alternative implementations.
@@ -208,13 +204,6 @@ public:
     }
 
     /**
-     * TODO: write comment.
-     */
-    inline unsigned long long generationCount() const {
-        return this->_impl().generationCount();
-    }
-
-    /**
      * Sets this index to be multikey. Information regarding which newly detected path components
      * cause this index to be multikey can also be specified.
      *
@@ -246,7 +235,7 @@ public:
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must treat this index as unfinished.
      */
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() {
+    boost::optional<Timestamp> getMinimumVisibleSnapshot() const {
         return this->_impl().getMinimumVisibleSnapshot();
     }
 

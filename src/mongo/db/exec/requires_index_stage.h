@@ -49,7 +49,8 @@ public:
           _indexCatalogEntry(collection()->getIndexCatalog()->getEntry(indexDescriptor)),
           _indexAccessMethod(_indexCatalogEntry->accessMethod()),
           _indexName(indexDescriptor->indexName()),
-          _generationCount(_indexCatalogEntry->generationCount()) {}
+          // TODO: Can we ever get boost::none here?
+          _indexMinimumVisibleSnapshot(*_indexCatalogEntry->getMinimumVisibleSnapshot()) {}
 
     virtual ~RequiresIndexStage() = default;
 
@@ -85,7 +86,7 @@ private:
     const IndexAccessMethod* _indexAccessMethod;
 
     const std::string _indexName;
-    const unsigned long long _generationCount;
+    const Timestamp _indexMinimumVisibleSnapshot;
 };
 
 }  // namespace mongo

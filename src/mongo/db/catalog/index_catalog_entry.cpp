@@ -46,15 +46,13 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* opCtx,
                                      StringData ns,
                                      CollectionCatalogEntry* collection,
                                      std::unique_ptr<IndexDescriptor> descriptor,
-                                     CollectionInfoCache* infoCache,
-                                     unsigned long long generationCount)
+                                     CollectionInfoCache* infoCache)
     : _pimpl(makeImpl(this,
                       opCtx,
                       ns,
                       collection,
                       std::move(descriptor),
                       infoCache,
-                      generationCount,
                       PrivateCall<IndexCatalogEntry>{})) {}
 
 void IndexCatalogEntry::init(std::unique_ptr<IndexAccessMethod> accessMethod) {

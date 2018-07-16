@@ -63,8 +63,7 @@ public:
         StringData ns,
         CollectionCatalogEntry* collection,           // not owned
         std::unique_ptr<IndexDescriptor> descriptor,  // ownership passes to me
-        CollectionInfoCache* infoCache,               // not owned, optional
-        unsigned long long generationCount);
+        CollectionInfoCache* infoCache);              // not owned, optional
 
     ~IndexCatalogEntryImpl() final;
 
@@ -158,16 +157,12 @@ public:
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must treat this index as unfinished.
      */
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() final {
+    boost::optional<Timestamp> getMinimumVisibleSnapshot() const final {
         return _minVisibleSnapshot;
     }
 
     void setMinimumVisibleSnapshot(Timestamp name) final {
         _minVisibleSnapshot = name;
-    }
-
-    unsigned long long generationCount() const final {
-        return _generationCount;
     }
 
 private:
@@ -237,8 +232,5 @@ private:
 
     // The earliest snapshot that is allowed to read this index.
     boost::optional<Timestamp> _minVisibleSnapshot;
-
-    // TODO: write comment.
-    const unsigned long long _generationCount = 0ULL;
 };
 }  // namespace mongo

@@ -163,6 +163,12 @@ NamespaceString AutoGetCollection::resolveNamespaceStringOrUUID(OperationContext
     return resolvedNss;
 }
 
+QueryExecLock AutoGetCollection::extractQueryExecLock() {
+    invariant(_collLock);
+    return {NamespaceStringOrUUID{_resolvedNss}, _autoDb.extractDbLock(), std::move(*_collLock)};
+}
+
+
 AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
                                      StringData dbName,
                                      LockMode mode,
@@ -182,6 +188,61 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
     }
 
     DatabaseShardingState::get(_db).checkDbVersion(opCtx);
+}
+
+QueryExecLock::QueryExecLock(OperationContext* opCtx,
+                             NamespaceStringOrUUID nssOrUuid,
+                             LockMode dbLockMode,
+                             LockMode collLockMode,
+                             Date_t deadline)
+    : _nssOrUuid(std::move(nssOrUuid)), _dbLockMode(dbLockMode), _collLockMode(collLockMode) {
+    lock(opCtx, deadline);
+}
+
+QueryExecLock::QueryExecLock(NamespaceStringOrUUID nssOrUuid,
+                             Lock::DBLock&& dbLock,
+                             Lock::CollectionLock&& collLock)
+    : _nssOrUuid(std::move(nssOrUuid)),
+      _dbLockMode(dbLock.lockMode()),
+      _collLockMode(collLock.lockMode()),
+      _dbLock(std::move(dbLock)),
+      _collLock(std::move(collLock)) {}
+
+void QueryExecLock::lock(OperationContext* opCtx, Date_t deadline) {
+    invariant(!_dbLock);
+    invariant(!_collLock);
+
+    // Resolve the NSS outside of any locks.
+    auto resolvedNss = AutoGetCollection::resolveNamespaceStringOrUUID(opCtx, _nssOrUuid);
+
+    _dbLock.emplace(opCtx, resolvedNss.db(), _dbLockMode, deadline);
+    uassertLockTimeout(str::stream() << "database " << resolvedNss.db(),
+                       _dbLockMode,
+                       deadline,
+                       _dbLock->isLocked());
+
+    // In order to account for possible collection rename happening because the resolution from UUID
+    // to NamespaceString was done outside of database lock, if UUID was specified we need to
+    // re-resolve the _resolvedNss after acquiring the database lock so it has the correct value.
+    //
+    // Holding a database lock prevents collection renames, so this guarantees a stable UUID to
+    // NamespaceString mapping.
+    if (_nssOrUuid.uuid()) {
+        resolvedNss = AutoGetCollection::resolveNamespaceStringOrUUID(opCtx, _nssOrUuid);
+    }
+
+    _collLock.emplace(opCtx->lockState(), resolvedNss.ns(), _collLockMode, deadline);
+    uassertLockTimeout(str::stream() << "collection " << resolvedNss.toString(),
+                       _collLockMode,
+                       deadline,
+                       _collLock->isLocked());
+}
+
+void QueryExecLock::unlock() {
+    invariant(_dbLock);
+    invariant(_collLock);
+    _collLock.reset();
+    _dbLock.reset();
 }
 
 }  // namespace mongo

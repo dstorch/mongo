@@ -266,7 +266,7 @@ Lock::CollectionLock::CollectionLock(Locker* lockState,
                                      StringData ns,
                                      LockMode mode,
                                      Date_t deadline)
-    : _id(RESOURCE_COLLECTION, ns), _result(LOCK_INVALID), _lockState(lockState) {
+    : _id(RESOURCE_COLLECTION, ns), _result(LOCK_INVALID), _lockMode(mode), _lockState(lockState) {
     massert(28538, "need a non-empty collection name", nsIsFull(ns));
 
     dassert(_lockState->isDbLockedForMode(nsToDatabaseSubstring(ns),
@@ -281,7 +281,10 @@ Lock::CollectionLock::CollectionLock(Locker* lockState,
 }
 
 Lock::CollectionLock::CollectionLock(CollectionLock&& otherLock)
-    : _id(otherLock._id), _result(otherLock._result), _lockState(otherLock._lockState) {
+    : _id(otherLock._id),
+      _result(otherLock._result),
+      _lockMode(otherLock._lockMode),
+      _lockState(otherLock._lockState) {
     otherLock._lockState = nullptr;
     otherLock._result = LOCK_INVALID;
 }

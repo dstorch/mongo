@@ -130,17 +130,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     unique_ptr<WorkingSet> ws,
     unique_ptr<PlanStage> rt,
     const Collection* collection,
-    YieldPolicy yieldPolicy,
-    PlanExecutor::LockPolicy lockPolicy) {
-    return PlanExecutor::make(opCtx,
-                              std::move(ws),
-                              std::move(rt),
-                              nullptr,
-                              nullptr,
-                              collection,
-                              {},
-                              yieldPolicy,
-                              lockPolicy);
+    YieldPolicy yieldPolicy) {
+    return PlanExecutor::make(
+        opCtx, std::move(ws), std::move(rt), nullptr, nullptr, collection, {}, yieldPolicy);
 }
 
 // static
@@ -149,8 +141,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     unique_ptr<WorkingSet> ws,
     unique_ptr<PlanStage> rt,
     NamespaceString nss,
-    YieldPolicy yieldPolicy,
-    PlanExecutor::LockPolicy lockPolicy) {
+    YieldPolicy yieldPolicy) {
     return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(rt),
@@ -158,8 +149,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
                               nullptr,
                               nullptr,
                               std::move(nss),
-                              yieldPolicy,
-                              lockPolicy);
+                              yieldPolicy);
 }
 
 // static
@@ -169,17 +159,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     unique_ptr<PlanStage> rt,
     unique_ptr<CanonicalQuery> cq,
     const Collection* collection,
-    YieldPolicy yieldPolicy,
-    PlanExecutor::LockPolicy lockPolicy) {
-    return PlanExecutor::make(opCtx,
-                              std::move(ws),
-                              std::move(rt),
-                              nullptr,
-                              std::move(cq),
-                              collection,
-                              {},
-                              yieldPolicy,
-                              lockPolicy);
+    YieldPolicy yieldPolicy) {
+    return PlanExecutor::make(
+        opCtx, std::move(ws), std::move(rt), nullptr, std::move(cq), collection, {}, yieldPolicy);
 }
 
 // static
@@ -190,8 +172,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     unique_ptr<QuerySolution> qs,
     unique_ptr<CanonicalQuery> cq,
     const Collection* collection,
-    YieldPolicy yieldPolicy,
-    PlanExecutor::LockPolicy lockPolicy) {
+    YieldPolicy yieldPolicy) {
     return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(rt),
@@ -199,8 +180,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
                               std::move(cq),
                               collection,
                               {},
-                              yieldPolicy,
-                              lockPolicy);
+                              yieldPolicy);
 }
 
 // static
@@ -212,8 +192,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     unique_ptr<CanonicalQuery> cq,
     const Collection* collection,
     NamespaceString nss,
-    YieldPolicy yieldPolicy,
-    PlanExecutor::LockPolicy lockPolicy) {
+    YieldPolicy yieldPolicy) {
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(
         new PlanExecutor(opCtx,
@@ -223,8 +202,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
                          std::move(cq),
                          collection,
                          std::move(nss),
-                         yieldPolicy,
-                         lockPolicy),
+                         yieldPolicy),
         PlanExecutor::Deleter(opCtx, collection));
 
     // Perform plan selection, if necessary.
@@ -243,15 +221,13 @@ PlanExecutor::PlanExecutor(OperationContext* opCtx,
                            unique_ptr<CanonicalQuery> cq,
                            const Collection* collection,
                            NamespaceString nss,
-                           YieldPolicy yieldPolicy,
-                           PlanExecutor::LockPolicy lockPolicy)
+                           YieldPolicy yieldPolicy)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
       _nss(std::move(nss)),
-      _lockPolicy(lockPolicy),
       // There's no point in yielding if the collection doesn't exist.
       _yieldPolicy(makeYieldPolicy(this, collection ? yieldPolicy : NO_YIELD)) {
     // We may still need to initialize _nss from either collection or _cq.

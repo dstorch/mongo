@@ -306,8 +306,11 @@ public:
 
         Collection* const collection = ctx->getCollection();
 
+        auto queryExecLock = ctx->extractQueryExecLock();
+
         // Get the execution plan for the query.
-        auto statusWithPlanExecutor = getExecutorFind(opCtx, collection, nss, std::move(cq));
+        auto statusWithPlanExecutor =
+            getExecutorFind(opCtx, collection, std::move(queryExecLock), nss, std::move(cq));
         uassertStatusOK(statusWithPlanExecutor.getStatus());
 
         auto exec = std::move(statusWithPlanExecutor.getValue());

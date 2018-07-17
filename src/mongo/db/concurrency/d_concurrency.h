@@ -327,6 +327,10 @@ public:
             return _result == LOCK_OK;
         }
 
+        LockMode lockMode() const {
+            return _mode;
+        }
+
     private:
         const ResourceId _id;
         OperationContext* const _opCtx;
@@ -370,9 +374,14 @@ public:
             return _result == LOCK_OK;
         }
 
+        LockMode lockMode() const {
+            return _lockMode;
+        }
+
     private:
         const ResourceId _id;
         LockResult _result;
+        LockMode _lockMode;
         Locker* _lockState;
     };
 

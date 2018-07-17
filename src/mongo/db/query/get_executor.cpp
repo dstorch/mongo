@@ -476,6 +476,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
     Collection* collection,
+    QueryExecLock locks,
     unique_ptr<CanonicalQuery> canonicalQuery,
     PlanExecutor::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
@@ -667,6 +668,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getExecutorFind(
     OperationContext* opCtx,
     Collection* collection,
+    QueryExecLock locks,
     const NamespaceString& nss,
     unique_ptr<CanonicalQuery> canonicalQuery,
     PlanExecutor::YieldPolicy yieldPolicy,
@@ -678,7 +680,12 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getExecutorFind(
     if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, nss.ns())) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
-    return getExecutor(opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions);
+    return getExecutor(opCtx,
+                       collection,
+                       std::move(locks),
+                       std::move(canonicalQuery),
+                       yieldPolicy,
+                       plannerOptions);
 }
 
 }  // namespace
@@ -686,6 +693,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getExecutorFind(
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
     Collection* collection,
+    QueryExecLock locks,
     const NamespaceString& nss,
     unique_ptr<CanonicalQuery> canonicalQuery,
     size_t plannerOptions) {
@@ -693,17 +701,24 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     auto yieldPolicy = readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
         ? PlanExecutor::INTERRUPT_ONLY
         : PlanExecutor::YIELD_AUTO;
-    return _getExecutorFind(
-        opCtx, collection, nss, std::move(canonicalQuery), yieldPolicy, plannerOptions);
+    return _getExecutorFind(opCtx,
+                            collection,
+                            std::move(locks),
+                            nss,
+                            std::move(canonicalQuery),
+                            yieldPolicy,
+                            plannerOptions);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorLegacyFind(
     OperationContext* opCtx,
     Collection* collection,
+    QueryExecLock locks,
     const NamespaceString& nss,
     std::unique_ptr<CanonicalQuery> canonicalQuery) {
     return _getExecutorFind(opCtx,
                             collection,
+                            std::move(locks),
                             nss,
                             std::move(canonicalQuery),
                             PlanExecutor::YIELD_AUTO,

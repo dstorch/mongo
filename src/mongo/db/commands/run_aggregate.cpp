@@ -506,16 +506,11 @@ Status runAggregate(OperationContext* opCtx,
         // This PlanExecutor will simply forward requests to the Pipeline, so does not need to
         // yield or to be registered with any collection's CursorManager to receive invalidations.
         // The Pipeline may contain PlanExecutors which *are* yielding PlanExecutors and which *are*
-        // registered with their respective collection's CursorManager.
+        // registered with their respective collection's CursorManager
         //
         // TODO: The above comment looks pretty stale. This could use a new comment.
         auto statusWithPlanExecutor =
-            PlanExecutor::make(opCtx,
-                               std::move(ws),
-                               std::move(proxy),
-                               nss,
-                               PlanExecutor::NO_YIELD,
-                               PlanExecutor::LockPolicy::kLocksInternally);
+            PlanExecutor::make(opCtx, std::move(ws), std::move(proxy), nss, PlanExecutor::NO_YIELD);
         invariant(statusWithPlanExecutor.isOK());
         exec = std::move(statusWithPlanExecutor.getValue());
 

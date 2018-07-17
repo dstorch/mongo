@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+class QueryExecLock;
+
 /**
  * RAII-style class, which acquires a lock on the specified database in the requested mode and
  * obtains a reference to the database. Used as a shortcut for calls to
@@ -65,8 +67,12 @@ public:
         return _db;
     }
 
+    Lock::DBLock extractDbLock() {
+        return std::move(_dbLock);
+    }
+
 private:
-    const Lock::DBLock _dbLock;
+    Lock::DBLock _dbLock;
     Database* const _db;
 };
 
@@ -135,6 +141,8 @@ public:
         return _resolvedNss;
     }
 
+    QueryExecLock extractQueryExecLock();
+
 private:
     // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
     // the same as the input namespace string
@@ -185,6 +193,45 @@ private:
 
     Database* _db;
     bool _justCreated{false};
+};
+
+/**
+ * TODO: write comment.
+ * TODO: Disallow copying; ensure moveable.
+ */
+class QueryExecLock {
+public:
+    /**
+     * Constructs this query execution lock structure by acquiring the necessary locks.
+     */
+    QueryExecLock(OperationContext* opCtx,
+                  NamespaceStringOrUUID nssOrUuid,
+                  LockMode dbLockMode,
+                  LockMode collLockMode,
+                  Date_t deadline = Date_t::max());
+
+    /**
+     * Constructs this query execution lock structure from locks that are already held.
+     */
+    QueryExecLock(NamespaceStringOrUUID nssOrUuid,
+                  Lock::DBLock&& dbLock,
+                  Lock::CollectionLock&& collLock);
+
+    void lock(OperationContext* opCtx, Date_t deadline = Date_t::max());
+
+    void unlock();
+
+private:
+    // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it
+    // is
+    // the same as the input namespace string
+    NamespaceStringOrUUID _nssOrUuid;
+
+    LockMode _dbLockMode;
+    LockMode _collLockMode;
+
+    boost::optional<Lock::DBLock> _dbLock;
+    boost::optional<Lock::CollectionLock> _collLock;
 };
 
 }  // namespace mongo

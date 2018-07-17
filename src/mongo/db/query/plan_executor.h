@@ -137,16 +137,6 @@ public:
         ALWAYS_MARK_KILLED,
     };
 
-    // TODO: write comment.
-    enum class LockPolicy {
-        // The caller is responsible for locking the collection over which this PlanExecutor
-        // executes.
-        kLockExternally,
-
-        // The caller should hold no locks; this PlanExecutor acquires the necessary locks.
-        kLocksInternally,
-    };
-
     /**
      * This class will ensure a PlanExecutor is disposed before it is deleted.
      *
@@ -213,8 +203,7 @@ public:
         std::unique_ptr<WorkingSet> ws,
         std::unique_ptr<PlanStage> rt,
         const Collection* collection,
-        YieldPolicy yieldPolicy,
-        LockPolicy lockPolicy = LockPolicy::kLockExternally);
+        YieldPolicy yieldPolicy);
 
     /**
      * Used when we have a NULL collection and no canonical query. In this case, we need to
@@ -225,8 +214,7 @@ public:
         std::unique_ptr<WorkingSet> ws,
         std::unique_ptr<PlanStage> rt,
         NamespaceString nss,
-        YieldPolicy yieldPolicy,
-        LockPolicy lockPolicy = LockPolicy::kLockExternally);
+        YieldPolicy yieldPolicy);
 
     /**
      * Used when there is a canonical query but no query solution (e.g. idhack queries, queries
@@ -238,8 +226,7 @@ public:
         std::unique_ptr<PlanStage> rt,
         std::unique_ptr<CanonicalQuery> cq,
         const Collection* collection,
-        YieldPolicy yieldPolicy,
-        LockPolicy lockPolicy = LockPolicy::kLockExternally);
+        YieldPolicy yieldPolicy);
 
     /**
      * The constructor for the normal case, when you have a collection, a canonical query, and a
@@ -252,8 +239,7 @@ public:
         std::unique_ptr<QuerySolution> qs,
         std::unique_ptr<CanonicalQuery> cq,
         const Collection* collection,
-        YieldPolicy yieldPolicy,
-        LockPolicy lockPolicy = LockPolicy::kLockExternally);
+        YieldPolicy yieldPolicy);
 
     //
     // Accessors
@@ -279,10 +265,6 @@ public:
      */
     const NamespaceString& nss() const {
         return _nss;
-    }
-
-    LockPolicy lockPolicy() const {
-        return _lockPolicy;
     }
 
     /**
@@ -509,8 +491,7 @@ private:
                  std::unique_ptr<CanonicalQuery> cq,
                  const Collection* collection,
                  NamespaceString nss,
-                 YieldPolicy yieldPolicy,
-                 LockPolicy lockPolicy);
+                 YieldPolicy yieldPolicy);
 
     /**
      * A PlanExecutor must be disposed before destruction. In most cases, this will happen
@@ -529,8 +510,7 @@ private:
         std::unique_ptr<CanonicalQuery> cq,
         const Collection* collection,
         NamespaceString nss,
-        YieldPolicy yieldPolicy,
-        LockPolicy lockPolicy = LockPolicy::kLockExternally);
+        YieldPolicy yieldPolicy);
 
     /**
      * Clients of PlanExecutor expect that on receiving a new instance from one of the make()
@@ -564,9 +544,6 @@ private:
 
     // What namespace are we operating over?
     NamespaceString _nss;
-
-    // TODO: Write comment.
-    LockPolicy _lockPolicy;
 
     // This is used to handle automatic yielding when allowed by the YieldPolicy. Never NULL.
     // TODO make this a non-pointer member. This requires some header shuffling so that this

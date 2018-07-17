@@ -26,6 +26,9 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
@@ -80,6 +83,7 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
     Collection* collection,
+    QueryExecLock locks,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanExecutor::YieldPolicy yieldPolicy,
     size_t plannerOptions = 0);
@@ -95,6 +99,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
     Collection* collection,
+    QueryExecLock locks,
     const NamespaceString& nss,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     size_t plannerOptions = QueryPlannerParams::DEFAULT);
@@ -105,6 +110,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorLegacyFind(
     OperationContext* opCtx,
     Collection* collection,
+    QueryExecLock locks,
     const NamespaceString& nss,
     std::unique_ptr<CanonicalQuery> canonicalQuery);
 

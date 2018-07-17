@@ -104,6 +104,11 @@ public:
         return _autoColl->getNss();
     }
 
+    QueryExecLock extractQueryExecLock() {
+        invariant(_autoColl);
+        return _autoColl->extractQueryExecLock();
+    }
+
 private:
     // If this field is set, the reader will not take the ParallelBatchWriterMode lock and conflict
     // with secondary batch application. This stays in scope with the _autoColl so that locks are
@@ -157,6 +162,10 @@ public:
 
     const NamespaceString& getNss() const {
         return _autoCollForRead.getNss();
+    }
+
+    QueryExecLock extractQueryExecLock() {
+        return _autoCollForRead.extractQueryExecLock();
     }
 
 private:

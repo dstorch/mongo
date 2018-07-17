@@ -38,6 +38,11 @@
 
 namespace mongo {
 
+void uassertLockTimeout(std::string resourceName,
+                        LockMode lockMode,
+                        Date_t deadline,
+                        bool isLocked);
+
 /**
  * RAII-style class, which acquires a lock on the specified database in the requested mode and
  * obtains a reference to the database. Used as a shortcut for calls to

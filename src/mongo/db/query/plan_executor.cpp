@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/multi_plan.h"
@@ -130,17 +131,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     unique_ptr<WorkingSet> ws,
     unique_ptr<PlanStage> rt,
     const Collection* collection,
-    YieldPolicy yieldPolicy,
-    PlanExecutor::LockPolicy lockPolicy) {
-    return PlanExecutor::make(opCtx,
-                              std::move(ws),
-                              std::move(rt),
-                              nullptr,
-                              nullptr,
-                              collection,
-                              {},
-                              yieldPolicy,
-                              lockPolicy);
+    YieldPolicy yieldPolicy) {
+    return PlanExecutor::make(
+        opCtx, std::move(ws), std::move(rt), nullptr, nullptr, collection, {}, yieldPolicy);
 }
 
 // static
@@ -149,8 +142,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     unique_ptr<WorkingSet> ws,
     unique_ptr<PlanStage> rt,
     NamespaceString nss,
-    YieldPolicy yieldPolicy,
-    PlanExecutor::LockPolicy lockPolicy) {
+    YieldPolicy yieldPolicy) {
     return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(rt),
@@ -158,8 +150,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
                               nullptr,
                               nullptr,
                               std::move(nss),
-                              yieldPolicy,
-                              lockPolicy);
+                              yieldPolicy);
 }
 
 // static
@@ -169,17 +160,9 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     unique_ptr<PlanStage> rt,
     unique_ptr<CanonicalQuery> cq,
     const Collection* collection,
-    YieldPolicy yieldPolicy,
-    PlanExecutor::LockPolicy lockPolicy) {
-    return PlanExecutor::make(opCtx,
-                              std::move(ws),
-                              std::move(rt),
-                              nullptr,
-                              std::move(cq),
-                              collection,
-                              {},
-                              yieldPolicy,
-                              lockPolicy);
+    YieldPolicy yieldPolicy) {
+    return PlanExecutor::make(
+        opCtx, std::move(ws), std::move(rt), nullptr, std::move(cq), collection, {}, yieldPolicy);
 }
 
 // static
@@ -190,8 +173,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     unique_ptr<QuerySolution> qs,
     unique_ptr<CanonicalQuery> cq,
     const Collection* collection,
-    YieldPolicy yieldPolicy,
-    PlanExecutor::LockPolicy lockPolicy) {
+    YieldPolicy yieldPolicy) {
     return PlanExecutor::make(opCtx,
                               std::move(ws),
                               std::move(rt),
@@ -199,8 +181,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
                               std::move(cq),
                               collection,
                               {},
-                              yieldPolicy,
-                              lockPolicy);
+                              yieldPolicy);
 }
 
 // static
@@ -212,8 +193,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
     unique_ptr<CanonicalQuery> cq,
     const Collection* collection,
     NamespaceString nss,
-    YieldPolicy yieldPolicy,
-    PlanExecutor::LockPolicy lockPolicy) {
+    YieldPolicy yieldPolicy) {
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(
         new PlanExecutor(opCtx,
@@ -223,8 +203,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PlanExecutor::make(
                          std::move(cq),
                          collection,
                          std::move(nss),
-                         yieldPolicy,
-                         lockPolicy),
+                         yieldPolicy),
         PlanExecutor::Deleter(opCtx, collection));
 
     // Perform plan selection, if necessary.
@@ -243,15 +222,13 @@ PlanExecutor::PlanExecutor(OperationContext* opCtx,
                            unique_ptr<CanonicalQuery> cq,
                            const Collection* collection,
                            NamespaceString nss,
-                           YieldPolicy yieldPolicy,
-                           PlanExecutor::LockPolicy lockPolicy)
+                           YieldPolicy yieldPolicy)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
       _nss(std::move(nss)),
-      _lockPolicy(lockPolicy),
       // There's no point in yielding if the collection doesn't exist.
       _yieldPolicy(makeYieldPolicy(this, collection ? yieldPolicy : NO_YIELD)) {
     // We may still need to initialize _nss from either collection or _cq.
@@ -724,6 +701,40 @@ Status PlanExecutor::executePlan() {
 
 void PlanExecutor::enqueue(const BSONObj& obj) {
     _stash.push(obj.getOwned());
+}
+
+void PlanExecutor::lock(Date_t deadline) {
+    invariant(!_dbLock);
+    invariant(!_collLock);
+
+    // If the yield policy is NO_YIELD, either callers hold locks for the duration of this
+    // executor's lifetime, or it is not necessary to hold locks at all (e.g. this is the outer
+    // executor for an agg cursor).
+    if (_yieldPolicy->getPolicy() == PlanExecutor::NO_YIELD) {
+        return;
+    }
+
+    auto lockMode = getLockModeForQuery(_opCtx);
+    // TODO: Using _nss is probably wrong for queries surviving rename.
+    _dbLock.emplace(_opCtx, _nss.db(), lockMode, deadline);
+    uassertLockTimeout(
+        str::stream() << "database " << _nss.db(), lockMode, deadline, _dbLock->isLocked());
+
+    // This could be the first time that we ever acquire the database lock. We may need to raise
+    // this operation's profiling level based on the profiling level of the datbase.
+    auto* db = DatabaseHolder::getDatabaseHolder().get(_opCtx, _nss.db());
+    CurOp::get(_opCtx)->raiseDbProfileLevel(db->getProfilingLevel());
+
+    _collLock.emplace(_opCtx->lockState(), _nss.ns(), lockMode, deadline);
+    uassertLockTimeout(str::stream() << "collection " << _nss.toString(),
+                       lockMode,
+                       deadline,
+                       _collLock->isLocked());
+}
+
+void PlanExecutor::unlock() {
+    _collLock.reset();
+    _dbLock.reset();
 }
 
 Timestamp PlanExecutor::getLatestOplogTimestamp() {

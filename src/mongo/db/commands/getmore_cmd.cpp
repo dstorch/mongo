@@ -142,7 +142,6 @@ class GetMoreCmd : public BasicCommand {
 public:
     GetMoreCmd() : BasicCommand("getMore") {}
 
-
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -246,41 +245,14 @@ public:
         // Note that we acquire our locks before our ClientCursorPin, in order to ensure that
         // the pin's destructor is called before the lock's destructor (if there is one) so that the
         // cursor cleanup can occur under the lock.
-        boost::optional<AutoGetCollectionForRead> readLock;
-        boost::optional<AutoStatsTracker> statsTracker;
+        //
+        // TODO: The comment above needs work.
         CursorManager* cursorManager = CursorManager::getGlobalCursorManager();
-
-        if (boost::optional<NamespaceString> nssForCurOp = request.nss.isGloballyManagedNamespace()
-                ? request.nss.getTargetNSForGloballyManagedNamespace()
-                : request.nss) {
-            const boost::optional<int> dbProfilingLevel = boost::none;
-            statsTracker.emplace(opCtx, *nssForCurOp, Top::LockType::NotLocked, dbProfilingLevel);
-        }
 
         auto ccPin = cursorManager->pinCursor(opCtx, request.cursorid);
         uassertStatusOK(ccPin.getStatus());
 
         ClientCursor* cursor = ccPin.getValue().getCursor();
-
-        if (cursor->getExecutor()->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally) {
-            // We need to hold locks in order to run this PlanExecutor.
-            readLock.emplace(opCtx, request.nss);
-            const int doNotChangeProfilingLevel = 0;
-            statsTracker.emplace(opCtx,
-                                 request.nss,
-                                 Top::LockType::ReadLocked,
-                                 readLock->getDb() ? readLock->getDb()->getProfilingLevel()
-                                                   : doNotChangeProfilingLevel);
-        }
-
-        // Only used by the failpoints.
-        const auto dropAndReaquireReadLock = [&readLock, opCtx, &request]() {
-            // Make sure an interrupted operation does not prevent us from reacquiring the lock.
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
-            readLock.reset();
-            readLock.emplace(opCtx, request.nss);
-        };
 
         // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the 'msg'
         // field of this operation's CurOp to signal that we've hit this point and then repeatedly
@@ -291,8 +263,7 @@ public:
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &waitAfterPinningCursorBeforeGetMoreBatch,
                 opCtx,
-                "waitAfterPinningCursorBeforeGetMoreBatch",
-                dropAndReaquireReadLock);
+                "waitAfterPinningCursorBeforeGetMoreBatch");
         }
 
         // A user can only call getMore on their own cursor. If there were multiple users
@@ -368,7 +339,26 @@ public:
 
         PlanExecutor* exec = cursor->getExecutor();
         exec->reattachToOperationContext(opCtx);
+        ScopedPlanExecLock execLock(exec);
         uassertStatusOK(exec->restoreState());
+
+        // Only used by the failpoints.
+        const auto dropAndReaquireReadLock = [opCtx, exec]() {
+            // Make sure an interrupted operation does not prevent us from reacquiring the lock.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            exec->unlock();
+            exec->lock();
+        };
+
+        boost::optional<AutoStatsTracker> statsTracker;
+        if (auto nssForStats = exec->nss().isGloballyManagedNamespace()
+                ? exec->nss().getTargetNSForGloballyManagedNamespace()
+                : exec->nss()) {
+            const int doNotChangeProfilingLevel = 0;
+            // TODO: Is it ok to report all getMores as "read locked"?
+            statsTracker.emplace(
+                opCtx, *nssForStats, Top::LockType::ReadLocked, doNotChangeProfilingLevel);
+        }
 
         auto planSummary = Explain::getPlanSummary(exec);
         {
@@ -410,8 +400,7 @@ public:
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
                 &waitWithPinnedCursorDuringGetMoreBatch,
                 opCtx,
-                "waitWithPinnedCursorDuringGetMoreBatch",
-                dropAndReaquireReadLock);
+                "waitWithPinnedCursorDuringGetMoreBatch");
         }
 
         Status batchStatus = generateBatch(opCtx, cursor, request, &nextBatch, &state, &numResults);

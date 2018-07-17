@@ -39,6 +39,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -251,6 +252,8 @@ Message getMore(OperationContext* opCtx,
     // Note that we acquire our locks before our ClientCursorPin, in order to ensure that the pin's
     // destructor is called before the lock's destructor (if there is one) so that the cursor
     // cleanup can occur under the lock.
+    //
+    // TODO: This will all have to change in the same way that getMore cmd did.
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     boost::optional<AutoGetCollectionForRead> readLock;
     boost::optional<AutoStatsTracker> statsTracker;
@@ -273,6 +276,13 @@ Message getMore(OperationContext* opCtx,
                                  "query views.",
                 !view);
     }
+    // This checks to make sure the operation is allowed on a replicated node.  Since we are not
+    // passing in a query object (necessary to check SlaveOK query option), we allow reads
+    // whether we are PRIMARY or SECONDARY.
+    //
+    // TODO: Was this check missing in the globally managed cursor case?
+    /* uassertStatusOK( */
+    /*     repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, true)); */
 
     LOG(5) << "Running getMore, cursorid: " << cursorid;
 
@@ -322,24 +332,6 @@ Message getMore(OperationContext* opCtx,
                     ->isCoauthorizedWith(cc->getAuthenticatedUsers()));
 
         *isCursorAuthorized = true;
-
-        if (cc->getExecutor()->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally) {
-            readLock.emplace(opCtx, nss);
-            const int doNotChangeProfilingLevel = 0;
-            statsTracker.emplace(opCtx,
-                                 nss,
-                                 Top::LockType::ReadLocked,
-                                 readLock->getDb() ? readLock->getDb()->getProfilingLevel()
-                                                   : doNotChangeProfilingLevel);
-
-            // This checks to make sure the operation is allowed on a replicated node.  Since we are
-            // not passing in a query object (necessary to check SlaveOK query option), we allow
-            // reads whether we are PRIMARY or SECONDARY.
-            //
-            // TODO: Is this check missing in the "locks internally"  case?
-            uassertStatusOK(
-                repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, true));
-        }
 
         const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
 

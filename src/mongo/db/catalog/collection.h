@@ -42,7 +42,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"

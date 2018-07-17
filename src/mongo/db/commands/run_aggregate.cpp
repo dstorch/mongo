@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -510,12 +511,7 @@ Status runAggregate(OperationContext* opCtx,
         //
         // TODO: The above comment looks pretty stale. This could use a new comment.
         auto statusWithPlanExecutor =
-            PlanExecutor::make(opCtx,
-                               std::move(ws),
-                               std::move(proxy),
-                               nss,
-                               PlanExecutor::NO_YIELD,
-                               PlanExecutor::LockPolicy::kLocksInternally);
+            PlanExecutor::make(opCtx, std::move(ws), std::move(proxy), nss, PlanExecutor::NO_YIELD);
         invariant(statusWithPlanExecutor.isOK());
         exec = std::move(statusWithPlanExecutor.getValue());
 

@@ -37,8 +37,8 @@
 
 namespace mongo {
 namespace {
-
 MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
+}  // namespace
 
 void uassertLockTimeout(std::string resourceName,
                         LockMode lockMode,
@@ -53,7 +53,6 @@ void uassertLockTimeout(std::string resourceName,
             isLocked);
 }
 
-}  // namespace
 
 AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, Date_t deadline)
     : _dbLock(opCtx, dbName, mode, deadline), _db([&] {

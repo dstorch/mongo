@@ -33,6 +33,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/util/partitioned.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/stdx/unordered_set.h"
@@ -137,16 +138,6 @@ public:
         ALWAYS_MARK_KILLED,
     };
 
-    // TODO: write comment.
-    enum class LockPolicy {
-        // The caller is responsible for locking the collection over which this PlanExecutor
-        // executes.
-        kLockExternally,
-
-        // The caller should hold no locks; this PlanExecutor acquires the necessary locks.
-        kLocksInternally,
-    };
-
     /**
      * This class will ensure a PlanExecutor is disposed before it is deleted.
      *
@@ -213,8 +204,7 @@ public:
         std::unique_ptr<WorkingSet> ws,
         std::unique_ptr<PlanStage> rt,
         const Collection* collection,
-        YieldPolicy yieldPolicy,
-        LockPolicy lockPolicy = LockPolicy::kLockExternally);
+        YieldPolicy yieldPolicy);
 
     /**
      * Used when we have a NULL collection and no canonical query. In this case, we need to
@@ -225,8 +215,7 @@ public:
         std::unique_ptr<WorkingSet> ws,
         std::unique_ptr<PlanStage> rt,
         NamespaceString nss,
-        YieldPolicy yieldPolicy,
-        LockPolicy lockPolicy = LockPolicy::kLockExternally);
+        YieldPolicy yieldPolicy);
 
     /**
      * Used when there is a canonical query but no query solution (e.g. idhack queries, queries
@@ -238,8 +227,7 @@ public:
         std::unique_ptr<PlanStage> rt,
         std::unique_ptr<CanonicalQuery> cq,
         const Collection* collection,
-        YieldPolicy yieldPolicy,
-        LockPolicy lockPolicy = LockPolicy::kLockExternally);
+        YieldPolicy yieldPolicy);
 
     /**
      * The constructor for the normal case, when you have a collection, a canonical query, and a
@@ -252,8 +240,7 @@ public:
         std::unique_ptr<QuerySolution> qs,
         std::unique_ptr<CanonicalQuery> cq,
         const Collection* collection,
-        YieldPolicy yieldPolicy,
-        LockPolicy lockPolicy = LockPolicy::kLockExternally);
+        YieldPolicy yieldPolicy);
 
     //
     // Accessors
@@ -279,10 +266,6 @@ public:
      */
     const NamespaceString& nss() const {
         return _nss;
-    }
-
-    LockPolicy lockPolicy() const {
-        return _lockPolicy;
     }
 
     /**
@@ -353,6 +336,16 @@ public:
      * This is only public for PlanYieldPolicy. DO NOT CALL ANYWHERE ELSE.
      */
     Status restoreStateWithoutRetrying();
+
+    /**
+     * TODO: Write comment.
+     */
+    void lock(Date_t deadline = Date_t::max());
+
+    /**
+     * TODO: Write comment.
+     */
+    void unlock();
 
     //
     // Running Support
@@ -509,8 +502,7 @@ private:
                  std::unique_ptr<CanonicalQuery> cq,
                  const Collection* collection,
                  NamespaceString nss,
-                 YieldPolicy yieldPolicy,
-                 LockPolicy lockPolicy);
+                 YieldPolicy yieldPolicy);
 
     /**
      * A PlanExecutor must be disposed before destruction. In most cases, this will happen
@@ -529,8 +521,7 @@ private:
         std::unique_ptr<CanonicalQuery> cq,
         const Collection* collection,
         NamespaceString nss,
-        YieldPolicy yieldPolicy,
-        LockPolicy lockPolicy = LockPolicy::kLockExternally);
+        YieldPolicy yieldPolicy);
 
     /**
      * Clients of PlanExecutor expect that on receiving a new instance from one of the make()
@@ -563,10 +554,9 @@ private:
     Status _killStatus = Status::OK();
 
     // What namespace are we operating over?
+    //
+    // TODO: I think this is misleading now that collection renames can happen.
     NamespaceString _nss;
-
-    // TODO: Write comment.
-    LockPolicy _lockPolicy;
 
     // This is used to handle automatic yielding when allowed by the YieldPolicy. Never NULL.
     // TODO make this a non-pointer member. This requires some header shuffling so that this
@@ -581,6 +571,27 @@ private:
     enum { kUsable, kSaved, kDetached, kDisposed } _currentState = kUsable;
 
     bool _everDetachedFromOperationContext = false;
+
+    boost::optional<Lock::DBLock> _dbLock;
+    boost::optional<Lock::CollectionLock> _collLock;
+};
+
+/**
+ * TODO: Write comment.
+ * TODO: Make non-copyable.
+ */
+class ScopedPlanExecLock {
+public:
+    ScopedPlanExecLock(PlanExecutor* exec) : _exec(exec) {
+        _exec->lock();
+    }
+
+    ~ScopedPlanExecLock() {
+        _exec->unlock();
+    }
+
+private:
+    PlanExecutor* _exec;
 };
 
 }  // namespace mongo

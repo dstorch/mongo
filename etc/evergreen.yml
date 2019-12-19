@@ -583,6 +583,30 @@ functions:
         path: src/corpus.tgz
         destination: src/corpus
 
+  "fetch mongohouse binaries": &fetch_mongohouse_binaries
+    command: s3.get
+    params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${mh_archive}
+        bucket: mciuploads
+        local_file: src/mh.tgz
+        build_variants: *mh_variants
+
+  "extract mongohouse binaries": &extract_mongohouse_binaries
+    command: shell.exec
+    params:
+      working_dir: src
+      build_variants: *mh_variants
+      script: |
+        set -o errexit
+        mkdir -p mh_artifacts
+        mv mh.tgz mh_artifacts
+        cd mh_artifacts
+        ${decompress} mh.tgz
+        cd ../
+        cp mh_artifacts/mongodb*/bin/mqlrun .
+
   "archive new corpus": &archive_new_corpus
     command: archive.targz_pack
     params:
@@ -7602,15 +7626,7 @@ tasks:
         bucket: mciuploads
         local_file: src/mongo-cryptd.tgz
         build_variants: *mongocryptd_variants
-    # Fetch mh
-    - command: s3.get
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: ${mh_archive}
-        bucket: mciuploads
-        local_file: src/mh.tgz
-        build_variants: *mh_variants
+    - func: "fetch mongohouse binaries"
     # Fetch the sources (on relevant variants only)
     - command: s3.get
       params:
@@ -8210,6 +8226,15 @@ tasks:
           $python buildscripts/validate_commit_message.py "${commit_message}"
         fi
 
+- <<: *task_template
+  name: mqlrun
+  commands:
+  - func: "do setup"
+  - func: "fetch mongohouse binaries"
+  - func: "extract mongohouse binaries"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=mqlrun
 
 #######################################
 #             Task Groups             #
@@ -9300,6 +9325,7 @@ buildvariants:
   - name: jsCore_ese
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
+  - name: mqlrun
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets .common
@@ -9620,6 +9646,7 @@ buildvariants:
   - name: .jscore .common !.compat !.decimal !.sharding
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
+  - name: mqlrun
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -9755,6 +9782,7 @@ buildvariants:
   - name: jsonSchema
   - name: .jstestfuzz
   - name: .logical_session_cache
+  - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion

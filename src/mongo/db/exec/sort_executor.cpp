@@ -61,3 +61,4 @@ MONGO_CREATE_SORTER(mongo::Value,
 MONGO_CREATE_SORTER(mongo::Value,
                     mongo::SortableWorkingSetMember,
                     mongo::SortExecutor<mongo::SortableWorkingSetMember>::Comparator);
+MONGO_CREATE_SORTER(mongo::Value, mongo::BSONObj, mongo::SortExecutor<mongo::BSONObj>::Comparator);

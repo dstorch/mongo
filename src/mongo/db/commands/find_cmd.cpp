@@ -86,13 +86,20 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                                        ->makeFromBSON(queryRequest.getCollation()));
     }
 
+    const auto assumeInternalClient = !opCtx->getClient()->session() ||
+        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
+
+    // If the client might be internal, then we need to be prepared for the possibility that the
+    // data might need to be merged (e.g. this is a find request from mongos, and mongos is
+    // gathering data from multiple shards).
+    const bool needsMerge = assumeInternalClient;
+
     // Although both 'find' and 'aggregate' commands have an ExpressionContext, some of the data
     // members in the ExpressionContext are used exclusively by the aggregation subsystem. This
     // includes the following fields which here we simply initialize to some meaningless default
     // value:
     //  - explain
     //  - fromMongos
-    //  - needsMerge
     //  - bypassDocumentValidation
     //  - mongoProcessInterface
     //  - resolvedNamespaces
@@ -103,8 +110,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     auto expCtx =
         make_intrusive<ExpressionContext>(opCtx,
                                           verbosity,
-                                          false,  // fromMongos
-                                          false,  // needsMerge
+                                          false,       // fromMongos
+                                          needsMerge,  // needsMerge
                                           queryRequest.allowDiskUse(),
                                           false,  // bypassDocumentValidation
                                           queryRequest.nss(),
@@ -115,9 +122,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                                           boost::none  // uuid
         );
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+
     // TODO (SERVER-43361): We will not need to set 'sortKeyFormat' after branching for 4.5.
-    auto assumeInternalClient = !opCtx->getClient()->session() ||
-        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
     if (assumeInternalClient) {
         expCtx->sortKeyFormat =
             queryRequest.use44SortKeys() ? SortKeyFormat::k44SortKey : SortKeyFormat::k42SortKey;

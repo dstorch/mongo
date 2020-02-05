@@ -556,11 +556,11 @@ public:
         QuerySolution* soln = pickBestPlan(cq.get());
 
         // The best must not be a collscan.
-        ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: {node:"
-            "{fetch: {filter: null, node: "
-            "{ixscan: {filter: null, pattern: {_id: 1}}}}}}}}}",
-            soln->root.get()));
+        ASSERT(
+            QueryPlannerTestLib::solutionMatches("{sort: {pattern: {c: 1}, limit: 0, node:"
+                                                 "{fetch: {filter: null, node: "
+                                                 "{ixscan: {filter: null, pattern: {_id: 1}}}}}}}",
+                                                 soln->root.get()));
     }
 };
 

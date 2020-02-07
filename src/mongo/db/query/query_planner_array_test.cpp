@@ -2384,9 +2384,9 @@ TEST_F(QueryPlannerTest, CantExplodeMultikeyIxscanForSort) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {b: 1}, limit: 0, type: 'simple', node:"
         "{fetch: {filter: null, node: {ixscan: {pattern: {a: 1, b: 1}, filter: null, bounds: {a: "
-        "[[1,1,true,true], [2,2,true,true]], b: [['MinKey','MaxKey',true,true]]}}}}}}}}}");
+        "[[1,1,true,true], [2,2,true,true]], b: [['MinKey','MaxKey',true,true]]}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CantExplodeMultikeyIxscanForSortWithPathLevelMultikeyMetadata) {
@@ -2398,9 +2398,9 @@ TEST_F(QueryPlannerTest, CantExplodeMultikeyIxscanForSortWithPathLevelMultikeyMe
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{sort: {pattern: {'b.c': 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{sort: {pattern: {'b.c': 1}, limit: 0, type: 'simple', node: "
         "{fetch: {filter: null, node: {ixscan: {pattern: {a: 1, 'b.c': 1}, filter: null, bounds: "
-        "{a: [[1,1,true,true], [2,2,true,true]], 'b.c': [['MinKey','MaxKey',true,true]]}}}}}}}}}");
+        "{a: [[1,1,true,true], [2,2,true,true]], 'b.c': [['MinKey','MaxKey',true,true]]}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CanExplodeMultikeyIndexScanForSortWhenSortFieldsAreNotMultikey) {

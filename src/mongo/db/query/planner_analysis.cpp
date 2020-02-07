@@ -401,7 +401,7 @@ std::unique_ptr<ProjectionNode> analyzeProjection(const CanonicalQuery& query,
  */
 std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     std::unique_ptr<QuerySolutionNode> root) {
-    if (isProjectionStageType(root->getType())) {
+    if (!isProjectionStageType(root->getType())) {
         // There's no projection to push down.
         return root;
     }

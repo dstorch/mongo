@@ -148,13 +148,22 @@ void DocumentSourceParquet::appendFirstValueFromColumn(ColumnInfo& column,
             return;
         }
         case parquet::Type::BYTE_ARRAY: {
-            // TODO: Handle other logical types, like strings here?
             parquet::ByteArray value =
                 readSingleColumnValue<parquet::ByteArray, parquet::ByteArrayReader>(
                     column.reader.get());
 
-            builder.appendBinData(fieldName, value.len, BinDataType::BinDataGeneral, value.ptr);
-            return;
+            // TODO: Handle additional logical types.
+            switch (column.descriptor.logical_type()->type()) {
+                case parquet::LogicalType::Type::STRING:
+                    builder.append(
+                        fieldName, reinterpret_cast<const char*>(value.ptr), value.len + 1);
+                    return;
+                default:
+                    // Default to using BSON "genneral" BinData.
+                    builder.appendBinData(
+                        fieldName, value.len, BinDataType::BinDataGeneral, value.ptr);
+                    return;
+            }
         }
         case parquet::Type::FIXED_LEN_BYTE_ARRAY: {
             uasserted(6000001, "not implemented");

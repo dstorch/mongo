@@ -85,6 +85,21 @@ public:
         return boost::none;
     }
 
+    DepsTracker::State getDependencies(DepsTracker* deps) const override {
+        // The $parquet stage accepts the dependency set computed by analyzing subsequent stages:
+        // see 'setDependencies()'. So here we should just pass over the $parquet stage and move
+        // onto the next stage in the pipeline.
+        return DepsTracker::State::SEE_NEXT;
+    }
+
+    /**
+     * Configures this stage to only extract the columns named by 'dependencies'. Can be used in
+     * conjunction with dependency analysis to avoid extracting unnecessary columns.
+     */
+    void setDependencies(std::set<std::string> dependencies) {
+        _columnsToProcess = std::move(dependencies);
+    }
+
 protected:
     /**
      * Pairs a reader for a single column in a parquet file with a description of that column's
@@ -138,7 +153,14 @@ protected:
     int _totalRowsInGroup = -1;
     int _curRow = -1;
 
-    // A reader and descritptor for each column in the parquet file.
+    // If boost::none, then this stage is configured to extract all columns from the parquet file.
+    // If non-none, then only the named columns will be extracted.
+    //
+    // TODO: Should we represent the columns here with some other type, e.g. FieldPath?
+    boost::optional<std::set<std::string>> _columnsToProcess;
+
+    // A reader and descritptor for each column in the parquet file, or a subset of columns if there
+    // is a dependency set.
     std::vector<ColumnInfo> _columns;
 };
 

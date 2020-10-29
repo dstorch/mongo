@@ -81,7 +81,13 @@ void DocumentSourceParquet::initForNextRowGroup() {
 
     std::vector<ColumnInfo> newColumns;
     for (int i = 0; i < rowGroupMetadata->num_columns(); ++i) {
-        newColumns.emplace_back(rowGroupReader->Column(i), *schemaDescriptor->Column(i));
+        const auto& columnDescriptor = *schemaDescriptor->Column(i);
+
+        // Only create a reader for columns in the dependency set.
+        if (!_columnsToProcess ||
+            _columnsToProcess->find(columnDescriptor.name()) != _columnsToProcess->end()) {
+            newColumns.emplace_back(rowGroupReader->Column(i), columnDescriptor);
+        }
     }
     _columns.swap(newColumns);
 }

@@ -60,6 +60,7 @@
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_parquet.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
@@ -313,6 +314,36 @@ StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx,
     }
     MONGO_UNREACHABLE;
 }
+
+void performParquetSourceDependencyAnalysis(DocumentSourceParquet* parquetStage,
+                                            Pipeline* pipeline) {
+    auto dependencies = pipeline->getDependencies(DepsTracker::kAllMetadata);
+
+    // Just bail if there are metadata dependencies for now.
+    //
+    // TODO: We know that such dependencies won't be satisfied, so maybe we can ignore this case.
+    if (dependencies.getNeedsAnyMetadata()) {
+        return;
+    }
+
+    if (dependencies.needWholeDocument) {
+        return;
+    }
+
+    parquetStage->setDependencies(dependencies.fields);
+}
+
+void performVirtualCollectionDependencyAnalysis(Pipeline* pipeline) {
+    auto sources = pipeline->getSources();
+    if (sources.empty()) {
+        return;
+    }
+
+    if (auto parquetStage = dynamic_cast<DocumentSourceParquet*>(sources.front().get())) {
+        performParquetSourceDependencyAnalysis(parquetStage, pipeline);
+    }
+}
+
 }  // namespace
 
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
@@ -326,6 +357,7 @@ PipelineD::buildInnerQueryExecutor(const CollectionPtr& collection,
     Pipeline::SourceContainer& sources = pipeline->_sources;
 
     if (!sources.empty() && !sources.front()->constraints().requiresInputDocSource) {
+        performVirtualCollectionDependencyAnalysis(pipeline);
         return {};
     }
 

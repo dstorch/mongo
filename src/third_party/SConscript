@@ -343,6 +343,18 @@ pcreEnv.Library(
         'shim_pcrecpp.cc',
     ])
 
+# TODO: Vendorize the arrow and parquet libraries. Right now, we require a system installation. The
+# LIBPATH variable should be used to tell the linker where to find the these libraries.
+arrowEnv = env.Clone()
+arrowEnv.Library(
+    target='shim_arrow',
+    source=[
+        'shim_arrow.cpp',
+    ],
+    SYSLIBDEPS=[
+        'arrow',
+        'parquet',
+    ])
 
 boostEnv = env
 if use_system_version_of_library("boost"):

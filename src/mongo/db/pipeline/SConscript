@@ -195,7 +195,7 @@ env.Library(
 )
 
 pipelineEnv = env.Clone()
-pipelineEnv.InjectThirdParty(libraries=['snappy'])
+pipelineEnv.InjectThirdParty(libraries=['arrow', 'snappy'])
 pipelineEnv.Library(
     target='pipeline',
     source=[
@@ -232,6 +232,7 @@ pipelineEnv.Library(
         'document_source_merge.cpp',
         'document_source_operation_metrics.cpp',
         'document_source_out.cpp',
+        'document_source_parquet.cpp',
         'document_source_plan_cache_stats.cpp',
         'document_source_project.cpp',
         'document_source_queue.cpp',
@@ -284,6 +285,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/update/update_document_diff',
         '$BUILD_DIR/mongo/db/views/resolved_view',
         '$BUILD_DIR/mongo/s/is_mongos',
+        '$BUILD_DIR/third_party/shim_arrow',
         '$BUILD_DIR/third_party/shim_snappy',
         'accumulator',
         'dependencies',

@@ -69,6 +69,7 @@ public:
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
 
+        constraints.isIndependentOfAnyCollection = true;
         constraints.requiresInputDocSource = false;
         return constraints;
     }
@@ -101,17 +102,22 @@ protected:
     GetNextResult doGetNext() override;
 
     /**
-     * TODO
+     * Prepares state for reading the next row group, e.g. by creating column readers for each
+     * column in the row group. Legal to call even if there are no remaining row groups to convert;
+     * this scenario is checked internally, causing this function to bail out rather than modify
+     * further state.
      */
     void initForNextRowGroup();
 
     /**
-     * TODO
+     * Converts the next row in the current row group into a Document. Requires reading the next
+     * value from each column reader.
      */
     Document convertRow();
 
     /**
-     * TODO
+     * Appends the next value in 'column' to 'builder', using the field name associated with the
+     * column.
      */
     void appendFirstValueFromColumn(ColumnInfo& column, BSONObjBuilder& builder);
 

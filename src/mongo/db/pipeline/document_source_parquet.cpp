@@ -33,21 +33,170 @@
 
 namespace mongo {
 
-boost::intrusive_ptr<DocumentSourceParquet> DocumentSourceParquet::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, std::string fileName) {
-    return new DocumentSourceParquet(expCtx, std::move(fileName));
+REGISTER_DOCUMENT_SOURCE(parquet,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceParquet::createFromBson);
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceParquet::createFromBson(
+    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(
+        6000000, "$parquet stage takes a single string argument", elem.type() == BSONType::String);
+    try {
+        return make_intrusive<DocumentSourceParquet>(expCtx, elem.str());
+    } catch (...) {
+        uasserted(600003, "Failed to open parquet file");
+    }
 }
 
 DocumentSourceParquet::DocumentSourceParquet(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              std::string fileName)
-    : DocumentSource(kStageName, expCtx), _fileName(std::move(fileName)) {}
+    : DocumentSource(kStageName, expCtx),
+      _fileName(std::move(fileName)),
+      _fileReader(parquet::ParquetFileReader::OpenFile(_fileName, false)),
+      _totalRowGroups(_fileReader->metadata()->num_row_groups()) {
+    initForNextRowGroup();
+}
 
 const char* DocumentSourceParquet::getSourceName() const {
     return kStageName.rawData();
 }
 
+void DocumentSourceParquet::initForNextRowGroup() {
+    ++_curRowGroup;
+
+    // If there is no next row group, then bail out, since there is no other state to initialize.
+    if (_curRowGroup >= _totalRowGroups) {
+        return;
+    }
+
+    invariant(_curRowGroup >= 0);
+    invariant(_curRowGroup < _totalRowGroups);
+
+    auto rowGroupReader = _fileReader->RowGroup(_curRowGroup);
+    auto rowGroupMetadata = rowGroupReader->metadata();
+    auto schemaDescriptor = rowGroupMetadata->schema();
+
+    _totalRowsInGroup = rowGroupMetadata->num_rows();
+    _curRow = 0;
+
+    std::vector<ColumnInfo> newColumns;
+    for (int i = 0; i < rowGroupMetadata->num_columns(); ++i) {
+        newColumns.emplace_back(rowGroupReader->Column(i), *schemaDescriptor->Column(i));
+    }
+    _columns.swap(newColumns);
+}
+
+namespace {
+template <typename T, typename ReaderType>
+T readSingleColumnValue(parquet::ColumnReader* reader) {
+    auto typedReader = static_cast<ReaderType*>(reader);
+
+    T value;
+    int64_t valuesRead;
+    // TODO: Might have to deal with definition/repetition levels.
+    auto rowsRead = typedReader->ReadBatch(1, nullptr, nullptr, &value, &valuesRead);
+
+    invariant(rowsRead == 1);
+    invariant(valuesRead == 1);
+
+    return value;
+}
+}  // namespace
+
+void DocumentSourceParquet::appendFirstValueFromColumn(ColumnInfo& column,
+                                                       BSONObjBuilder& builder) {
+    // The caller should have ensured that there are values left in this column.
+    invariant(column.reader->HasNext());
+    StringData fieldName = column.descriptor.name();
+
+    // TODO: Handle "converted type" / "logical type"? Right now just handling the primitive types.
+    switch (column.descriptor.physical_type()) {
+        case parquet::Type::BOOLEAN: {
+            bool value = readSingleColumnValue<bool, parquet::BoolReader>(column.reader.get());
+            builder.append(fieldName, value);
+            return;
+        }
+        case parquet::Type::INT32: {
+            int32_t value =
+                readSingleColumnValue<int32_t, parquet::Int32Reader>(column.reader.get());
+            builder.append(fieldName, value);
+            return;
+        }
+        case parquet::Type::INT64: {
+            int64_t value =
+                readSingleColumnValue<int64_t, parquet::Int64Reader>(column.reader.get());
+            builder.append(fieldName, value);
+            return;
+        }
+        case parquet::Type::INT96: {
+            // TODO: Use BSON BinData for these? For now just omitting them from the output.
+            return;
+        }
+        case parquet::Type::FLOAT: {
+            float floatValue =
+                readSingleColumnValue<float, parquet::FloatReader>(column.reader.get());
+            // Convert the float to a double, since BSON does not have single-precision floating
+            // point.
+            double doubleValue = floatValue;
+            builder.append(fieldName, doubleValue);
+            return;
+        }
+        case parquet::Type::DOUBLE: {
+            double value =
+                readSingleColumnValue<double, parquet::DoubleReader>(column.reader.get());
+            builder.append(fieldName, value);
+            return;
+        }
+        case parquet::Type::BYTE_ARRAY: {
+            // TODO: Handle other logical types, like strings here?
+            parquet::ByteArray value =
+                readSingleColumnValue<parquet::ByteArray, parquet::ByteArrayReader>(
+                    column.reader.get());
+
+            builder.appendBinData(fieldName, value.len, BinDataType::BinDataGeneral, value.ptr);
+            return;
+        }
+        case parquet::Type::FIXED_LEN_BYTE_ARRAY: {
+            uasserted(6000001, "not implemented");
+        }
+        case parquet::Type::UNDEFINED:
+            uasserted(6000002, "physical type was UNDEFINED");
+    }
+}
+
+Document DocumentSourceParquet::convertRow() {
+    // TODO: Should we convert directly to Document, or to BSON first?
+    BSONObjBuilder rowBuilder;
+
+    for (auto&& column : _columns) {
+        appendFirstValueFromColumn(column, rowBuilder);
+    }
+
+    // We're done with the current row, so make sure to increment the counter.
+    ++_curRow;
+    return Document{rowBuilder.obj()};
+}
+
 DocumentSource::GetNextResult DocumentSourceParquet::doGetNext() {
-    MONGO_UNREACHABLE;
+    if (_curRow >= _totalRowsInGroup) {
+        // We've already returned all of the rows in this group. Initialize state for the next
+        // group.
+        initForNextRowGroup();
+    }
+
+    if (_curRowGroup >= _totalRowGroups) {
+        // We've finished pivoting all row groups.
+        return GetNextResult::makeEOF();
+    }
+
+    // At this point, we know that there is a row for us to return. And the counters for the current
+    // row group as well as the current row within the group should reflect this.
+    invariant(_curRowGroup >= 0);
+    invariant(_curRowGroup < _totalRowGroups);
+    invariant(_curRow >= 0);
+    invariant(_curRow < _totalRowsInGroup);
+
+    return convertRow();
 }
 
 }  // namespace mongo

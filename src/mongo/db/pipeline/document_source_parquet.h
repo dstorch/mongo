@@ -31,6 +31,7 @@
 
 #include <parquet/api/reader.h>
 
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {
@@ -44,8 +45,8 @@ class DocumentSourceParquet : public DocumentSource {
 public:
     static constexpr StringData kStageName = "parquet"_sd;
 
-    static boost::intrusive_ptr<DocumentSourceParquet> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, std::string fileName);
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceParquet(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           std::string fileName);
@@ -99,8 +100,37 @@ protected:
 
     GetNextResult doGetNext() override;
 
+    /**
+     * TODO
+     */
+    void initForNextRowGroup();
+
+    /**
+     * TODO
+     */
+    Document convertRow();
+
+    /**
+     * TODO
+     */
+    void appendFirstValueFromColumn(ColumnInfo& column, BSONObjBuilder& builder);
+
     // File path for the input parquet file.
-    std::string _fileName;
+    const std::string _fileName;
+
+    // Top-level reader for the parquet file, provided by arrow library.
+    const std::shared_ptr<parquet::ParquetFileReader> _fileReader;
+
+    // The total number of row groups in the input file.
+    const int _totalRowGroups;
+
+    // Parquet files are split into row groups. Keep track of which one we are on.
+    int _curRowGroup = -1;
+
+    // The number of rows converted so far in the current row group, as well as the total number of
+    // rows in the row group.
+    int _totalRowsInGroup = -1;
+    int _curRow = -1;
 
     // A reader and descritptor for each column in the parquet file.
     std::vector<ColumnInfo> _columns;

@@ -43,8 +43,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceParquet::createFromBson(
         6000000, "$parquet stage takes a single string argument", elem.type() == BSONType::String);
     try {
         return make_intrusive<DocumentSourceParquet>(expCtx, elem.str());
-    } catch (...) {
-        uasserted(600003, "Failed to open parquet file");
+    } catch (const std::exception& ex) {
+        uasserted(600003, str::stream() << "Failed to open parquet file: " << ex.what());
     }
 }
 
@@ -53,9 +53,7 @@ DocumentSourceParquet::DocumentSourceParquet(const boost::intrusive_ptr<Expressi
     : DocumentSource(kStageName, expCtx),
       _fileName(std::move(fileName)),
       _fileReader(parquet::ParquetFileReader::OpenFile(_fileName, false)),
-      _totalRowGroups(_fileReader->metadata()->num_row_groups()) {
-    initForNextRowGroup();
-}
+      _totalRowGroups(_fileReader->metadata()->num_row_groups()) {}
 
 const char* DocumentSourceParquet::getSourceName() const {
     return kStageName.rawData();
@@ -86,6 +84,15 @@ void DocumentSourceParquet::initForNextRowGroup() {
         // Only create a reader for columns in the dependency set.
         if (!_columnsToProcess ||
             _columnsToProcess->find(columnDescriptor.name()) != _columnsToProcess->end()) {
+
+            // TODO: Supported higher definition levels and repetition levels.
+            uassert(600003,
+                    "max_definition_level is too high",
+                    columnDescriptor.max_definition_level() <= 1);
+            uassert(600003,
+                    "max_definition_level is too high",
+                    columnDescriptor.max_repetition_level() == 0);
+
             newColumns.emplace_back(rowGroupReader->Column(i), columnDescriptor);
         }
     }

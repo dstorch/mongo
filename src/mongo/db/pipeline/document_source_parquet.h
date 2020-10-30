@@ -151,7 +151,7 @@ protected:
     // The number of rows converted so far in the current row group, as well as the total number of
     // rows in the row group.
     int _totalRowsInGroup = -1;
-    int _curRow = -1;
+    int _curRow = 0;
 
     // If boost::none, then this stage is configured to extract all columns from the parquet file.
     // If non-none, then only the named columns will be extracted.

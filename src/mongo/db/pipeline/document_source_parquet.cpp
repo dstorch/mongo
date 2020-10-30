@@ -87,11 +87,20 @@ void DocumentSourceParquet::initForNextRowGroup() {
 
             // TODO: Supported higher definition levels and repetition levels.
             uassert(600003,
-                    "max_definition_level is too high",
+                    str::stream() << "max_definition_level is "
+                                  << columnDescriptor.max_definition_level()
+                                  << " but nested data is not supported yet",
                     columnDescriptor.max_definition_level() <= 1);
-            uassert(600003,
-                    "max_definition_level is too high",
-                    columnDescriptor.max_repetition_level() == 0);
+            uassert(600004,
+                    str::stream() << "column " << columnDescriptor.name()
+                                  << " has repeated fields, which are not yet implemented",
+                    !columnDescriptor.schema_node()->is_repeated());
+
+            // TODO:
+            std::cout << "!!! column: " << columnDescriptor.name()
+                      << ", repeated: " << columnDescriptor.schema_node()->is_repeated()
+                      << ", required: " << columnDescriptor.schema_node()->is_required()
+                      << std::endl;
 
             newColumns.emplace_back(rowGroupReader->Column(i), columnDescriptor);
         }
@@ -101,18 +110,26 @@ void DocumentSourceParquet::initForNextRowGroup() {
 
 namespace {
 template <typename T, typename ReaderType>
-T readSingleColumnValue(parquet::ColumnReader* reader) {
+boost::optional<T> readSingleColumnValue(parquet::ColumnReader* reader) {
     auto typedReader = static_cast<ReaderType*>(reader);
 
     T value;
     int64_t valuesRead;
-    // TODO: Might have to deal with definition/repetition levels.
-    auto rowsRead = typedReader->ReadBatch(1, nullptr, nullptr, &value, &valuesRead);
+    int16_t definitionLevel;
+    int16_t repetitionLevel;
+    auto rowsRead =
+        typedReader->ReadBatch(1, &definitionLevel, &repetitionLevel, &value, &valuesRead);
+
+    // TODO
+    // std::cout << "!!! definitionLevel: " << definitionLevel
+    //           << ", repetitionLevel: " << repetitionLevel << ", rowsRead: " << rowsRead
+    //           << ", valuesRead: " << valuesRead << std::endl;
 
     invariant(rowsRead == 1);
-    invariant(valuesRead == 1);
+    // TODO: Tighten this assertion depending on whether the column is nullable or not?
+    invariant(valuesRead == 0 || valuesRead == 1);
 
-    return value;
+    return valuesRead ? boost::optional<T>(value) : boost::none;
 }
 }  // namespace
 
@@ -125,20 +142,24 @@ void DocumentSourceParquet::appendFirstValueFromColumn(ColumnInfo& column,
     // TODO: Handle "converted type" / "logical type"? Right now just handling the primitive types.
     switch (column.descriptor.physical_type()) {
         case parquet::Type::BOOLEAN: {
-            bool value = readSingleColumnValue<bool, parquet::BoolReader>(column.reader.get());
-            builder.append(fieldName, value);
+            auto value = readSingleColumnValue<bool, parquet::BoolReader>(column.reader.get());
+            if (value) {
+                builder.append(fieldName, *value);
+            }
             return;
         }
         case parquet::Type::INT32: {
-            int32_t value =
-                readSingleColumnValue<int32_t, parquet::Int32Reader>(column.reader.get());
-            builder.append(fieldName, value);
+            auto value = readSingleColumnValue<int32_t, parquet::Int32Reader>(column.reader.get());
+            if (value) {
+                builder.append(fieldName, *value);
+            }
             return;
         }
         case parquet::Type::INT64: {
-            int64_t value =
-                readSingleColumnValue<int64_t, parquet::Int64Reader>(column.reader.get());
-            builder.append(fieldName, value);
+            auto value = readSingleColumnValue<int64_t, parquet::Int64Reader>(column.reader.get());
+            if (value) {
+                builder.append(fieldName, *value);
+            }
             return;
         }
         case parquet::Type::INT96: {
@@ -146,35 +167,40 @@ void DocumentSourceParquet::appendFirstValueFromColumn(ColumnInfo& column,
             return;
         }
         case parquet::Type::FLOAT: {
-            float floatValue =
+            auto floatValue =
                 readSingleColumnValue<float, parquet::FloatReader>(column.reader.get());
             // Convert the float to a double, since BSON does not have single-precision floating
             // point.
-            double doubleValue = floatValue;
-            builder.append(fieldName, doubleValue);
+            if (floatValue) {
+                double doubleValue = *floatValue;
+                builder.append(fieldName, doubleValue);
+            }
             return;
         }
         case parquet::Type::DOUBLE: {
-            double value =
-                readSingleColumnValue<double, parquet::DoubleReader>(column.reader.get());
-            builder.append(fieldName, value);
+            auto value = readSingleColumnValue<double, parquet::DoubleReader>(column.reader.get());
+            if (value) {
+                builder.append(fieldName, *value);
+            }
             return;
         }
         case parquet::Type::BYTE_ARRAY: {
-            parquet::ByteArray value =
-                readSingleColumnValue<parquet::ByteArray, parquet::ByteArrayReader>(
-                    column.reader.get());
+            auto value = readSingleColumnValue<parquet::ByteArray, parquet::ByteArrayReader>(
+                column.reader.get());
+            if (!value) {
+                return;
+            }
 
             // TODO: Handle additional logical types.
             switch (column.descriptor.logical_type()->type()) {
                 case parquet::LogicalType::Type::STRING:
                     builder.append(
-                        fieldName, reinterpret_cast<const char*>(value.ptr), value.len + 1);
+                        fieldName, reinterpret_cast<const char*>(value->ptr), value->len + 1);
                     return;
                 default:
                     // Default to using BSON "genneral" BinData.
                     builder.appendBinData(
-                        fieldName, value.len, BinDataType::BinDataGeneral, value.ptr);
+                        fieldName, value->len, BinDataType::BinDataGeneral, value->ptr);
                     return;
             }
         }
@@ -184,7 +210,7 @@ void DocumentSourceParquet::appendFirstValueFromColumn(ColumnInfo& column,
         case parquet::Type::UNDEFINED:
             uasserted(6000002, "physical type was UNDEFINED");
     }
-}
+}  // namespace mongo
 
 Document DocumentSourceParquet::convertRow() {
     // TODO: Should we convert directly to Document, or to BSON first?

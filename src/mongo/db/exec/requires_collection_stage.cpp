@@ -31,6 +31,8 @@
 
 #include "mongo/db/exec/requires_collection_stage.h"
 
+#include "mongo/db/query/plan_yield_policy.h"
+
 namespace mongo {
 
 void RequiresCollectionStage::doSaveState() {
@@ -41,12 +43,6 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
     auto collectionDropped = [this]() {
         uasserted(ErrorCodes::QueryPlanKilled,
                   str::stream() << "collection dropped. UUID " << _collectionUUID);
-    };
-
-    auto collectionRenamed = [this](const NamespaceString& newNss) {
-        uasserted(ErrorCodes::QueryPlanKilled,
-                  str::stream() << "collection renamed from '" << _nss << "' to '" << newNss
-                                << "'. UUID " << _collectionUUID);
     };
 
     if (context.type() == RestoreContext::RestoreType::kExternal) {
@@ -72,7 +68,7 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
             auto catalog = CollectionCatalog::get(opCtx());
             auto newNss = catalog->lookupNSSByUUID(opCtx(), _collectionUUID);
             if (newNss && *newNss != _nss) {
-                collectionRenamed(*newNss);
+                PlanYieldPolicy::throwCollectionRenamedError(_nss, *newNss, _collectionUUID);
             }
         }
     }
@@ -86,7 +82,7 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
     // TODO SERVER-31695: Allow queries to survive collection rename, rather than throwing here
     // when a rename has happened during yield.
     if (const auto& newNss = coll->ns(); newNss != _nss) {
-        collectionRenamed(newNss);
+        PlanYieldPolicy::throwCollectionRenamedError(_nss, newNss, _collectionUUID);
     }
 
     uassert(ErrorCodes::QueryPlanKilled,

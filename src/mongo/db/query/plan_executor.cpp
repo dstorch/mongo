@@ -27,19 +27,32 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <functional>
+#include "mongo/db/query/plan_executor.h"
 
-#include "mongo/db/db_raii.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/util/fail_point.h"
 
-namespace mongo::sbe {
-/**
- * A callback which gets called whenever a stage which accesses the storage engine (e.g. "scan",
- * "seek", or "ixscan") obtains or re-obtains its AutoGet*.
- */
-using LockAcquisitionCallback =
-    std::function<void(OperationContext*, const AutoGetCollectionForReadMaybeLockFree&)>;
+namespace mongo {
+namespace {
+MONGO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
+}  // namespace
 
-}  // namespace mongo::sbe
+std::string PlanExecutor::statestr(ExecState execState) {
+    switch (execState) {
+        case PlanExecutor::ADVANCED:
+            return "ADVANCED";
+        case PlanExecutor::IS_EOF:
+            return "IS_EOF";
+    }
+    MONGO_UNREACHABLE;
+}
+
+void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
+    if (MONGO_unlikely(planExecutorAlwaysFails.shouldFail())) {
+        uasserted(ErrorCodes::Error(4382101),
+                  "PlanExecutor hit planExecutorAlwaysFails fail point");
+    }
+}
+
+}  // namespace mongo

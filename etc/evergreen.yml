@@ -10406,6 +10406,7 @@ buildvariants:
     distros:
     - rhel62-medium
   - name: .aggregation !.no_async !.secondary_reads !.read_write_concern !.sharded !.unwind !aggregation_disabled_optimization
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
   - name: noPassthrough_gen
     distros:

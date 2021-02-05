@@ -81,6 +81,7 @@ env.Library(
     target='query_sbe_storage',
     source=[
         'stages/ix_scan.cpp',
+        'stages/restore_collection.cpp',
         'stages/scan.cpp',
         ],
     LIBDEPS=[

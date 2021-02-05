@@ -8,6 +8,12 @@
  * operation occurs.
  *
  * This workload was designed to reproduce SERVER-25039.
+ *
+ * TODO SERVER-54318: When SBE is enabled, this test fails with the same fassert as reported in
+ * SERVER-54318. When that problem is resolved, we should re-enable this test for SBE.
+ * @tags: [
+ *   sbe_incompatible,
+ * ]
  */
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');      // for extendWorkload

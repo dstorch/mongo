@@ -143,6 +143,11 @@ public:
     static std::string statestr(ExecState s);
 
     /**
+     * Throws a user exception if "planExecutorAlwaysFails" is enabled.
+     */
+    static void checkFailPointPlanExecAlwaysFails();
+
+    /**
      * A PlanExecutor must be disposed before destruction. In most cases, this will happen
      * automatically through a PlanExecutor::Deleter or a ClientCursor.
      */

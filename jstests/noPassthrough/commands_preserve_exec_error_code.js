@@ -2,9 +2,6 @@
 // with the original error code. This is important for retryable errors like
 // 'InterruptedDueToReplStateChange',
 // and also to ensure that the error is not swallowed and the diagnostic info is not lost.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 
@@ -48,10 +45,15 @@ assertCmdFailsWithExpectedError({distinct: coll.getName(), key: "_id"});
 assertCmdFailsWithExpectedError(
     {findAndModify: coll.getName(), query: {_id: 1}, update: {$set: {x: 2}}});
 
-const cmdRes = db.runCommand({find: coll.getName(), batchSize: 0});
-assert.commandWorked(cmdRes);
-assertCmdFailsWithExpectedError(
-    {getMore: cmdRes.cursor.id, collection: coll.getName(), batchSize: 1});
+// TODO SERVER-54491: Re-enable this test case for SBE when batchSize:0 works correctly with SBE.
+const isSbeEnabled = assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBE: 1}))
+                         .featureFlagSBE.value;
+if (!isSbeEnabled) {
+    const cmdRes = db.runCommand({find: coll.getName(), batchSize: 0});
+    assert.commandWorked(cmdRes);
+    assertCmdFailsWithExpectedError(
+        {getMore: cmdRes.cursor.id, collection: coll.getName(), batchSize: 1});
+}
 
 assert.commandWorked(db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "off"}));
 MongoRunner.stopMongod(mongod);

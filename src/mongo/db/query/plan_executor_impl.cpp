@@ -59,6 +59,7 @@
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
+#include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -78,7 +79,6 @@ const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommittedOpTime
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
 MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
 
 /**
@@ -93,7 +93,8 @@ std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(PlanExecutorImpl* exec,
         case PlanYieldPolicy::YieldPolicy::NO_YIELD:
         case PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
         case PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY: {
-            return std::make_unique<PlanYieldPolicyImpl>(exec, policy, yieldable);
+            return std::make_unique<PlanYieldPolicyImpl>(
+                exec, policy, yieldable, std::make_unique<YieldPolicyCallbacksImpl>(exec->nss()));
         }
         case PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT: {
             return std::make_unique<AlwaysTimeOutYieldPolicy>(exec);
@@ -212,16 +213,6 @@ PlanExecutorImpl::~PlanExecutorImpl() {
     invariant(_currentState == kDisposed);
 }
 
-std::string PlanExecutor::statestr(ExecState execState) {
-    switch (execState) {
-        case PlanExecutor::ADVANCED:
-            return "ADVANCED";
-        case PlanExecutor::IS_EOF:
-            return "IS_EOF";
-    }
-    MONGO_UNREACHABLE;
-}
-
 PlanStage* PlanExecutorImpl::getRootStage() const {
     return _root.get();
 }
@@ -323,10 +314,7 @@ PlanExecutor::ExecState PlanExecutorImpl::getNextDocument(Document* objOut, Reco
 
 PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* objOut,
                                                        RecordId* dlOut) {
-    if (MONGO_unlikely(planExecutorAlwaysFails.shouldFail())) {
-        uasserted(ErrorCodes::Error(4382101),
-                  "PlanExecutor hit planExecutorAlwaysFails fail point");
-    }
+    checkFailPointPlanExecAlwaysFails();
 
     invariant(_currentState == kUsable);
     if (isMarkedAsKilled()) {

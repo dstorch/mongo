@@ -83,7 +83,7 @@ protected:
     SBEParserTest() : planNodeId(12345) {
         stages = makeVector(
             // PSCAN
-            sbe::makeS<sbe::ParallelScanStage>(NamespaceString{"testDb", "testCollection"},
+            sbe::makeS<sbe::ParallelScanStage>(UUID::gen(),
                                                sbe::value::SlotId{1},
                                                sbe::value::SlotId{2},
                                                std::vector<std::string>{"a", "b"},

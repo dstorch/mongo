@@ -1691,16 +1691,13 @@ std::unique_ptr<PlanStage> Parser::parse(OperationContext* opCtx,
     return std::move(ast->stage);
 }
 
-NamespaceStringOrUUID Parser::getCollectionUuid(const std::string& collName) {
-    const auto ns = collName.find('.') == std::string::npos ? NamespaceString(_defaultDb, collName)
-                                                            : NamespaceString(collName);
-    if (_opCtx) {
-        AutoGetCollectionForRead collection(_opCtx, ns);
-        if (collection) {
-            return NamespaceStringOrUUID{ns.db().toString(), collection->uuid()};
-        }
-    }
-    return ns;
+CollectionUUID Parser::getCollectionUuid(const std::string& collName) {
+    invariant(_opCtx);
+    auto uuid = CollectionCatalog::get(_opCtx)->lookupUUIDByNSS(_opCtx, NamespaceString{collName});
+    uassert(5162900,
+            str::stream() << "SBE command parser could not find collection: " << collName,
+            uuid);
+    return *uuid;
 }
 
 PlanNodeId Parser::getCurrentPlanNodeId() {

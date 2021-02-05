@@ -2,7 +2,6 @@
 // operations performed at read concern level snapshot check for interrupt but do not yield locks or
 // storage engine resources.
 // @tags: [
-//   sbe_incompatible,
 //   uses_transactions,
 // ]
 (function() {
@@ -222,24 +221,31 @@ testCommand(function() {
 
 // Test getMore with an initial find batchSize of 0. Interrupt behavior of a getMore is not
 // expected to change with a change of batchSize in the originating command.
-testCommand(function() {
-    const session = db.getMongo().startSession({causalConsistency: false});
-    const sessionDb = session.getDatabase("test");
-    session.startTransaction({readConcern: {level: "snapshot"}});
-    assert.commandWorked(db.adminCommand(
-        {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}));
-    const initialFindBatchSize = 0;
-    const cursorId = assert
-                         .commandWorked(sessionDb.runCommand(
-                             {find: "coll", filter: {x: 1}, batchSize: initialFindBatchSize}))
-                         .cursor.id;
-    assert.commandWorked(db.adminCommand(
-        {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
-    const res = assert.commandWorked(
-        sessionDb.runCommand({getMore: NumberLong(cursorId), collection: "coll"}));
-    assert.commandWorked(session.commitTransaction_forTesting());
-    assert.eq(res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
-}, {"cursor.originatingCommand.filter": {x: 1}});
+//
+// TODO SERVER-54491: Re-enable this test case for SBE when batchSize:0 works correctly with SBE.
+const isSbeEnabled = assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBE: 1}))
+                         .featureFlagSBE.value;
+if (!isSbeEnabled) {
+    testCommand(function() {
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}));
+        const initialFindBatchSize = 0;
+        const cursorId = assert
+                             .commandWorked(sessionDb.runCommand(
+                                 {find: "coll", filter: {x: 1}, batchSize: initialFindBatchSize}))
+                             .cursor.id;
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
+        const res = assert.commandWorked(
+            sessionDb.runCommand({getMore: NumberLong(cursorId), collection: "coll"}));
+        assert.commandWorked(session.commitTransaction_forTesting());
+        assert.eq(
+            res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
+    }, {"cursor.originatingCommand.filter": {x: 1}});
+}
 
 // Test distinct.
 testCommand(function() {

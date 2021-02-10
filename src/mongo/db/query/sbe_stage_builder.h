@@ -328,6 +328,16 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildShardFilter(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    /**
+     * TODO: Comment needed. And why won't this clang format?
+     */
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildShardFilterCovered(
+        const ShardingFilterNode* filterNode,
+        std::unique_ptr<ShardFilterer> shardFilterer,
+        BSONObj shardKeyPattern,
+        const IndexScanNode* childIxscan,
+        PlanStageReqs childReqs);
+
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;

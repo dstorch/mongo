@@ -21,7 +21,7 @@ let rollbackNode = rollbackTest.transitionToRollbackOperations();
 
 setFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
 
-setFailPoint(rollbackNode, "GetMoreHangBeforeReadLock");
+setFailPoint(rollbackNode, "getMoreHangAfterPinCursor");
 
 const joinGetMoreThread = startParallelShell(() => {
     db.getMongo().setSecondaryOk();
@@ -59,7 +59,7 @@ reconnect(rollbackNode.getDB(dbName));
 // Wait for rollback to hang.
 checkLog.contains(rollbackNode, "rollbackHangAfterTransitionToRollback fail point enabled.");
 
-clearFailPoint(rollbackNode, "GetMoreHangBeforeReadLock");
+clearFailPoint(rollbackNode, "getMoreHangAfterPinCursor");
 
 jsTestLog("Wait for 'getMore' thread to join.");
 joinGetMoreThread();

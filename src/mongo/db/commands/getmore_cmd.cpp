@@ -625,6 +625,7 @@ public:
             exec->getPlanExplainer().getSummaryStats(&postExecutionStats);
             postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;
             postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
+            postExecutionStats.nFiltered -= preExecutionStats.nFiltered;
             curOp->debug().setPlanSummaryMetrics(postExecutionStats);
 
             // We do not report 'execStats' for aggregation or other cursors with the

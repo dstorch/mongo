@@ -96,6 +96,9 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
             *out = id;
             return PlanStage::ADVANCED;
         } else {
+            if (member->hasRecordId()) {
+                ++_specificStats.recordIdsFiltered;
+            }
             // Does not match, try again.
             _ws->free(id);
             return PlanStage::NEED_TIME;

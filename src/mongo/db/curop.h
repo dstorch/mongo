@@ -138,6 +138,10 @@ public:
         boost::optional<long long> keysExamined;
         boost::optional<long long> docsExamined;
 
+        // The number of storage records (e.g. index keys or documents associated with a record id)
+        // that were rejected by a filter.
+        boost::optional<long long> nFiltered;
+
         // Number of records that match the query.
         boost::optional<long long> nMatched;
         // Number of records written (no no-ops).

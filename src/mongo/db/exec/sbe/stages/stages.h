@@ -199,19 +199,33 @@ public:
 
     /**
      * Populates plan 'summary' object by walking through the entire PlanStage tree and for each
-     * node whose plan node ID equals to the given 'nodeId', or if 'nodeId' is 'kEmptyPlanNodeId',
-     * invoking 'accumulate(summary)' on the SpecificStats instance obtained by calling
+     * node invoking 'accumulate(summary)' on the SpecificStats instance obtained by calling
      * 'getSpecificStats()'.
      */
-    void accumulate(PlanNodeId nodeId, PlanSummaryStats& summary) const {
-        if (auto stats = getSpecificStats();
-            stats && (nodeId == kEmptyPlanNodeId || _commonStats.nodeId == nodeId)) {
+    void accumulate(PlanSummaryStats& summary) const {
+        if (auto stats = getSpecificStats()) {
             stats->accumulate(summary);
         }
 
         auto stage = static_cast<const T*>(this);
         for (auto&& child : stage->_children) {
-            child->accumulate(nodeId, summary);
+            child->accumulate(summary);
+        }
+    }
+
+    /**
+     * Similar to the 'accumulate()' overload above, except only gathers stats from nodes in the
+     * PlanStage tree whose PlanNodeId is within the provided 'nodeIds' set.
+     */
+    void accumulate(const std::set<PlanNodeId>& nodeIds, PlanSummaryStats& summary) const {
+        if (auto stats = getSpecificStats();
+            stats && nodeIds.find(_commonStats.nodeId) != nodeIds.end()) {
+            stats->accumulate(summary);
+        }
+
+        auto stage = static_cast<const T*>(this);
+        for (auto&& child : stage->_children) {
+            child->accumulate(nodeIds, summary);
         }
     }
 

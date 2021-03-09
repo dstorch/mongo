@@ -419,9 +419,13 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->fromMultiPlanner = isMultiPlan();
     statsOut->totalKeysExamined = 0;
     statsOut->totalDocsExamined = 0;
+    statsOut->nFiltered = 0;
 
     // Collect cumulative execution stats for the plan.
-    _root->accumulate(kEmptyPlanNodeId, *statsOut);
+    _root->accumulate(*statsOut);
+
+    // Keep track of the node ids for 'QuerySolutionNodes' that have a filter attached.
+    std::set<PlanNodeId> nodesWithFilter;
 
     std::queue<const QuerySolutionNode*> queue;
     queue.push(_solution->root());
@@ -433,6 +437,10 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
         auto node = queue.front();
         queue.pop();
         invariant(node);
+
+        if (node->filter) {
+            nodesWithFilter.insert(node->nodeId());
+        }
 
         switch (node->getType()) {
             case STAGE_COUNT_SCAN: {
@@ -458,11 +466,13 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
             case STAGE_IXSCAN: {
                 auto ixn = static_cast<const IndexScanNode*>(node);
                 statsOut->indexesUsed.insert(ixn->index.identifier.catalogName);
+
                 break;
             }
             case STAGE_TEXT: {
                 auto tn = static_cast<const TextNode*>(node);
                 statsOut->indexesUsed.insert(tn->index.identifier.catalogName);
+
                 break;
             }
             case STAGE_COLLSCAN: {
@@ -479,6 +489,14 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
         for (auto&& child : node->children) {
             queue.push(child);
         }
+    }
+
+    // Traverse the SBE plan tree a second time, this time to calculate the number of storage
+    // records filtered.
+    {
+        PlanSummaryStats nFilteredSummary;
+        _root->accumulate(nodesWithFilter, nFilteredSummary);
+        statsOut->nFiltered = nFilteredSummary.nFiltered;
     }
 }
 

@@ -26,6 +26,7 @@ selector:
   - jstests/core/profile_getmore.js
   - jstests/core/profile_insert.js
   - jstests/core/profile_mapreduce.js
+  - jstests/core/profile_nfiltered.js
   - jstests/core/profile_sampling.js
   - jstests/core/profile_update.js
   - jstests/core/txns/transactions_profiling.js

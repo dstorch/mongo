@@ -171,6 +171,9 @@ PlanStage::StageState FetchStage::returnIfMatches(WorkingSetMember* member,
         *out = memberID;
         return PlanStage::ADVANCED;
     } else {
+        if (member->hasRecordId()) {
+            ++_specificStats.recordIdsFiltered;
+        }
         _ws->free(memberID);
         return PlanStage::NEED_TIME;
     }

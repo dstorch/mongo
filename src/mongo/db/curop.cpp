@@ -888,6 +888,7 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
 
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("nFiltered", additiveMetrics.nFiltered);
     OPDEBUG_TOSTRING_HELP_BOOL(hasSortStage);
     OPDEBUG_TOSTRING_HELP_BOOL(usedDisk);
     OPDEBUG_TOSTRING_HELP_BOOL(fromMultiPlanner);
@@ -1059,6 +1060,7 @@ void OpDebug::report(OperationContext* opCtx,
 
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_TOATTR_HELP_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("nFiltered", additiveMetrics.nFiltered);
     OPDEBUG_TOATTR_HELP_BOOL(hasSortStage);
     OPDEBUG_TOATTR_HELP_BOOL(usedDisk);
     OPDEBUG_TOATTR_HELP_BOOL(fromMultiPlanner);
@@ -1193,6 +1195,7 @@ void OpDebug::append(OperationContext* opCtx,
 
     OPDEBUG_APPEND_OPTIONAL(b, "keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_APPEND_OPTIONAL(b, "docsExamined", additiveMetrics.docsExamined);
+    OPDEBUG_APPEND_OPTIONAL(b, "nFiltered", additiveMetrics.nFiltered);
     OPDEBUG_APPEND_BOOL(b, hasSortStage);
     OPDEBUG_APPEND_BOOL(b, usedDisk);
     OPDEBUG_APPEND_BOOL(b, fromMultiPlanner);
@@ -1595,6 +1598,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
 void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     additiveMetrics.keysExamined = planSummaryStats.totalKeysExamined;
     additiveMetrics.docsExamined = planSummaryStats.totalDocsExamined;
+    additiveMetrics.nFiltered = planSummaryStats.nFiltered;
     hasSortStage = planSummaryStats.hasSortStage;
     usedDisk = planSummaryStats.usedDisk;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
@@ -1648,6 +1652,7 @@ boost::optional<long long> addOptionalLongs(const boost::optional<long long>& lh
 void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     keysExamined = addOptionalLongs(keysExamined, otherMetrics.keysExamined);
     docsExamined = addOptionalLongs(docsExamined, otherMetrics.docsExamined);
+    nFiltered = addOptionalLongs(nFiltered, otherMetrics.nFiltered);
     nMatched = addOptionalLongs(nMatched, otherMetrics.nMatched);
     nModified = addOptionalLongs(nModified, otherMetrics.nModified);
     ninserted = addOptionalLongs(ninserted, otherMetrics.ninserted);
@@ -1662,6 +1667,7 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
 void OpDebug::AdditiveMetrics::reset() {
     keysExamined = boost::none;
     docsExamined = boost::none;
+    nFiltered = boost::none;
     nMatched = boost::none;
     nModified = boost::none;
     ninserted = boost::none;
@@ -1675,10 +1681,10 @@ void OpDebug::AdditiveMetrics::reset() {
 
 bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const {
     return keysExamined == otherMetrics.keysExamined && docsExamined == otherMetrics.docsExamined &&
-        nMatched == otherMetrics.nMatched && nModified == otherMetrics.nModified &&
-        ninserted == otherMetrics.ninserted && ndeleted == otherMetrics.ndeleted &&
-        nUpserted == otherMetrics.nUpserted && keysInserted == otherMetrics.keysInserted &&
-        keysDeleted == otherMetrics.keysDeleted &&
+        nFiltered == otherMetrics.nFiltered && nMatched == otherMetrics.nMatched &&
+        nModified == otherMetrics.nModified && ninserted == otherMetrics.ninserted &&
+        ndeleted == otherMetrics.ndeleted && nUpserted == otherMetrics.nUpserted &&
+        keysInserted == otherMetrics.keysInserted && keysDeleted == otherMetrics.keysDeleted &&
         prepareReadConflicts.load() == otherMetrics.prepareReadConflicts.load() &&
         writeConflicts.load() == otherMetrics.writeConflicts.load();
 }
@@ -1724,6 +1730,7 @@ string OpDebug::AdditiveMetrics::report() const {
 
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysExamined", keysExamined);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("docsExamined", docsExamined);
+    OPDEBUG_TOSTRING_HELP_OPTIONAL("nFiltered", nFiltered);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("nMatched", nMatched);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("nModified", nModified);
     OPDEBUG_TOSTRING_HELP_OPTIONAL("ninserted", ninserted);
@@ -1740,6 +1747,7 @@ string OpDebug::AdditiveMetrics::report() const {
 void OpDebug::AdditiveMetrics::report(logv2::DynamicAttributes* pAttrs) const {
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", keysExamined);
     OPDEBUG_TOATTR_HELP_OPTIONAL("docsExamined", docsExamined);
+    OPDEBUG_TOATTR_HELP_OPTIONAL("nFiltered", nFiltered);
     OPDEBUG_TOATTR_HELP_OPTIONAL("nMatched", nMatched);
     OPDEBUG_TOATTR_HELP_OPTIONAL("nModified", nModified);
     OPDEBUG_TOATTR_HELP_OPTIONAL("ninserted", ninserted);

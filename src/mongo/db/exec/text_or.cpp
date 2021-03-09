@@ -247,6 +247,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
         invariant(textRecordData->score == 0);
 
         if (!Filter::passes(newKeyData.keyData, newKeyData.indexKeyPattern, _filter)) {
+            ++_specificStats.keysFiltered;
             _ws->free(wsid);
             textRecordData->score = -1;
             return NEED_TIME;

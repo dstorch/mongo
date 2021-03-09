@@ -221,6 +221,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     }
 
     if (!Filter::passes(kv->key, _keyPattern, _filter)) {
+        ++_specificStats.keysFiltered;
         return PlanStage::NEED_TIME;
     }
 

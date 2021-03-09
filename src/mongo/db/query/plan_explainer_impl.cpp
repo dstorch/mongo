@@ -177,6 +177,28 @@ size_t getDocsExamined(StageType type, const SpecificStats* specific) {
 }
 
 /**
+ * Given the SpecificStats object for a stage and the type of the stage, returns the number of
+ * documents associated with a record id or index keys were rejected by a filter attached to that
+ * stage. Returns zero for stages that have no filter attached.
+ */
+size_t getNFiltered(StageType type, const SpecificStats* specific) {
+    switch (type) {
+        case STAGE_COLLSCAN:
+            return static_cast<const CollectionScanStats*>(specific)->docsFiltered;
+        case STAGE_FETCH:
+            return static_cast<const FetchStats*>(specific)->recordIdsFiltered;
+        case STAGE_IXSCAN:
+            return static_cast<const IndexScanStats*>(specific)->keysFiltered;
+        case STAGE_OR:
+            return static_cast<const OrStats*>(specific)->recordIdsFiltered;
+        case STAGE_TEXT_OR:
+            return static_cast<const TextOrStats*>(specific)->keysFiltered;
+        default:
+            return 0;
+    }
+}
+
+/**
  * Converts the stats tree 'stats' into a corresponding BSON object containing explain information.
  * If there is a MultiPlanStage node, skip that node, and follow the subplan at 'planIdx'.
  *
@@ -269,6 +291,7 @@ void statsToBSON(const PlanStageStats& stats,
         }
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->docsTested));
+            bob->appendNumber("docsFiltered", static_cast<long long>(spec->docsFiltered));
         }
     } else if (STAGE_COUNT == stats.stageType) {
         CountStats* spec = static_cast<CountStats*>(stats.specific.get());
@@ -348,6 +371,7 @@ void statsToBSON(const PlanStageStats& stats,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->docsExamined));
             bob->appendNumber("alreadyHasObj", static_cast<long long>(spec->alreadyHasObj));
+            bob->appendNumber("recordIdsFiltered", static_cast<long long>(spec->recordIdsFiltered));
         }
     } else if (STAGE_GEO_NEAR_2D == stats.stageType || STAGE_GEO_NEAR_2DSPHERE == stats.stageType) {
         NearStats* spec = static_cast<NearStats*>(stats.specific.get());
@@ -405,6 +429,7 @@ void statsToBSON(const PlanStageStats& stats,
             bob->appendNumber("seeks", static_cast<long long>(spec->seeks));
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
+            bob->appendNumber("keysFiltered", static_cast<long long>(spec->keysFiltered));
         }
     } else if (STAGE_OR == stats.stageType) {
         OrStats* spec = static_cast<OrStats*>(stats.specific.get());
@@ -412,6 +437,7 @@ void statsToBSON(const PlanStageStats& stats,
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
+            bob->appendNumber("recordIdsFiltered", static_cast<long long>(spec->recordIdsFiltered));
         }
     } else if (STAGE_LIMIT == stats.stageType) {
         LimitStats* spec = static_cast<LimitStats*>(stats.specific.get());
@@ -477,6 +503,7 @@ void statsToBSON(const PlanStageStats& stats,
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->fetches));
+            bob->appendNumber("keysFiltered", static_cast<long long>(spec->keysFiltered));
         }
     } else if (STAGE_UPDATE == stats.stageType) {
         UpdateStats* spec = static_cast<UpdateStats*>(stats.specific.get());
@@ -652,64 +679,48 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
 
     statsOut->totalKeysExamined = 0;
     statsOut->totalDocsExamined = 0;
+    statsOut->nFiltered = 0;
 
-    for (size_t i = 0; i < stages.size(); i++) {
-        statsOut->totalKeysExamined +=
-            getKeysExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
-        statsOut->totalDocsExamined +=
-            getDocsExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
+    for (auto&& stage : stages) {
+        auto stageType = stage->stageType();
+        auto specificStats = stage->getSpecificStats();
+        statsOut->totalKeysExamined += getKeysExamined(stageType, specificStats);
+        statsOut->totalDocsExamined += getDocsExamined(stageType, specificStats);
+        statsOut->nFiltered += getNFiltered(stageType, specificStats);
 
-        if (isSortStageType(stages[i]->stageType())) {
+        if (isSortStageType(stageType)) {
             statsOut->hasSortStage = true;
 
-            auto sortStage = static_cast<const SortStage*>(stages[i]);
-            auto sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
+            auto sortStats = static_cast<const SortStats*>(specificStats);
             statsOut->usedDisk = sortStats->spills > 0;
         }
 
-        if (STAGE_IXSCAN == stages[i]->stageType()) {
-            const IndexScan* ixscan = static_cast<const IndexScan*>(stages[i]);
-            const IndexScanStats* ixscanStats =
-                static_cast<const IndexScanStats*>(ixscan->getSpecificStats());
+        if (STAGE_IXSCAN == stageType) {
+            auto ixscanStats = static_cast<const IndexScanStats*>(specificStats);
             statsOut->indexesUsed.insert(ixscanStats->indexName);
-        } else if (STAGE_COUNT_SCAN == stages[i]->stageType()) {
-            const CountScan* countScan = static_cast<const CountScan*>(stages[i]);
-            const CountScanStats* countScanStats =
-                static_cast<const CountScanStats*>(countScan->getSpecificStats());
+        } else if (STAGE_COUNT_SCAN == stageType) {
+            auto countScanStats = static_cast<const CountScanStats*>(specificStats);
             statsOut->indexesUsed.insert(countScanStats->indexName);
-        } else if (STAGE_IDHACK == stages[i]->stageType()) {
-            const IDHackStage* idHackStage = static_cast<const IDHackStage*>(stages[i]);
-            const IDHackStats* idHackStats =
-                static_cast<const IDHackStats*>(idHackStage->getSpecificStats());
+        } else if (STAGE_IDHACK == stageType) {
+            auto idHackStats = static_cast<const IDHackStats*>(specificStats);
             statsOut->indexesUsed.insert(idHackStats->indexName);
-        } else if (STAGE_DISTINCT_SCAN == stages[i]->stageType()) {
-            const DistinctScan* distinctScan = static_cast<const DistinctScan*>(stages[i]);
-            const DistinctScanStats* distinctScanStats =
-                static_cast<const DistinctScanStats*>(distinctScan->getSpecificStats());
+        } else if (STAGE_DISTINCT_SCAN == stageType) {
+            auto distinctScanStats = static_cast<const DistinctScanStats*>(specificStats);
             statsOut->indexesUsed.insert(distinctScanStats->indexName);
-        } else if (STAGE_TEXT == stages[i]->stageType()) {
-            const TextStage* textStage = static_cast<const TextStage*>(stages[i]);
-            const TextStats* textStats =
-                static_cast<const TextStats*>(textStage->getSpecificStats());
+        } else if (STAGE_TEXT == stageType) {
+            auto textStats = static_cast<const TextStats*>(specificStats);
             statsOut->indexesUsed.insert(textStats->indexName);
-        } else if (STAGE_GEO_NEAR_2D == stages[i]->stageType() ||
-                   STAGE_GEO_NEAR_2DSPHERE == stages[i]->stageType()) {
-            const NearStage* nearStage = static_cast<const NearStage*>(stages[i]);
-            const NearStats* nearStats =
-                static_cast<const NearStats*>(nearStage->getSpecificStats());
+        } else if (STAGE_GEO_NEAR_2D == stageType || STAGE_GEO_NEAR_2DSPHERE == stageType) {
+            auto nearStats = static_cast<const NearStats*>(specificStats);
             statsOut->indexesUsed.insert(nearStats->indexName);
-        } else if (STAGE_CACHED_PLAN == stages[i]->stageType()) {
-            const CachedPlanStage* cachedPlan = static_cast<const CachedPlanStage*>(stages[i]);
-            const CachedPlanStats* cachedStats =
-                static_cast<const CachedPlanStats*>(cachedPlan->getSpecificStats());
+        } else if (STAGE_CACHED_PLAN == stageType) {
+            auto cachedStats = static_cast<const CachedPlanStats*>(specificStats);
             statsOut->replanReason = cachedStats->replanReason;
-        } else if (STAGE_MULTI_PLAN == stages[i]->stageType()) {
+        } else if (STAGE_MULTI_PLAN == stageType) {
             statsOut->fromMultiPlanner = true;
-        } else if (STAGE_COLLSCAN == stages[i]->stageType()) {
+        } else if (STAGE_COLLSCAN == stageType) {
             statsOut->collectionScans++;
-            const auto collScan = static_cast<const CollectionScan*>(stages[i]);
-            const auto collScanStats =
-                static_cast<const CollectionScanStats*>(collScan->getSpecificStats());
+            auto collScanStats = static_cast<const CollectionScanStats*>(specificStats);
             if (!collScanStats->tailable)
                 statsOut->collectionScansNonTailable++;
         }

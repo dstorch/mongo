@@ -103,14 +103,6 @@ struct CommonStats {
     // cache.
     boost::optional<long long> executionTimeMillis;
 
-    // TODO: have some way of tracking WSM sizes (or really any series of #s).  We can measure
-    // the size of our inputs and the size of our outputs.  We can do a lot with the WS here.
-
-    // TODO: once we've picked a plan, collect different (or additional) stats for display to
-    // the user, eg. time_t totalTimeSpent;
-
-    // TODO: keep track of the total yield time / fetch time done for a plan.
-
     bool failed;
     bool isEOF;
 };
@@ -237,7 +229,6 @@ struct CollectionScanStats : public SpecificStats {
         return sizeof(*this);
     }
 
-
     // How many documents did we check against our filter?
     size_t docsTested;
 
@@ -252,6 +243,9 @@ struct CollectionScanStats : public SpecificStats {
 
     // The end location of a reverse scan and start location for a forward scan.
     boost::optional<RecordId> maxRecord;
+
+    // The number of documents filtered out by any filter attached to the COLLSCAN.
+    size_t docsFiltered = 0u;
 };
 
 struct CountStats : public SpecificStats {
@@ -428,6 +422,12 @@ struct FetchStats : public SpecificStats {
 
     // The total number of full documents touched by the fetch stage.
     size_t docsExamined = 0u;
+
+    // The number of documents rejected by the filter attached to the FETCH stage, if such a filter
+    // exists. Only counts filtered documents that have a record id associated with them, as it's
+    // possible that the FETCH stage is acting on data that has already been fetched and is no
+    // longer associated with a record id.
+    size_t recordIdsFiltered = 0u;
 };
 
 struct IDHackStats : public SpecificStats {
@@ -533,6 +533,9 @@ struct IndexScanStats : public SpecificStats {
 
     // Number of times the index cursor is re-positioned during the execution of the scan.
     size_t seeks;
+
+    // The number of keys tested against a filter attached to the IXSCAN and rejected.
+    size_t keysFiltered = 0u;
 };
 
 struct LimitStats : public SpecificStats {
@@ -586,6 +589,13 @@ struct OrStats : public SpecificStats {
 
     size_t dupsTested = 0u;
     size_t dupsDropped = 0u;
+
+    // The number of WorkingSetMembers filtered out which had a record id. This includes index keys
+    // pointing to a particular record, as well as documents that have been fetched from the
+    // collection. It does not count WorkingSetMembers in OWNED_OBJ state; these have no record id
+    // and thus may no longer have a one-to-one correspondence with a document fetched from the
+    // collection.
+    size_t recordIdsFiltered = 0u;
 };
 
 struct ProjectionStats : public SpecificStats {
@@ -802,6 +812,10 @@ struct TextOrStats : public SpecificStats {
     }
 
     size_t fetches;
+
+    // The number of index keys from the text index rejected by a filter attached to the TEXT_OR
+    // stage.
+    size_t keysFiltered = 0u;
 };
 
 struct TrialStats : public SpecificStats {

@@ -110,6 +110,10 @@ struct PlanSummaryStats {
 
     // Was a replan triggered during the execution of this query?
     std::optional<std::string> replanReason;
+
+    // The number of record ids from storage that we looked at (either as index keys or documents
+    // from a collection) and subsequently discarded due to a filter.
+    size_t nFiltered = 0;
 };
 
 }  // namespace mongo

@@ -79,6 +79,7 @@ public:
 
             auto pass = _bytecode.runPredicate(_filterCode.get());
             if (!pass) {
+                ++_specificStats.numFiltered;
                 close();
                 return;
             }
@@ -109,6 +110,9 @@ public:
                 _specificStats.numTested++;
 
                 pass = _bytecode.runPredicate(_filterCode.get());
+                if (!pass) {
+                    ++_specificStats.numFiltered;
+                }
 
                 if constexpr (IsEof) {
                     if (!pass) {

@@ -112,7 +112,12 @@ struct FilterStats final : public SpecificStats {
         return sizeof(*this);
     }
 
+    void accumulate(PlanSummaryStats& stats) const final {
+        stats.nFiltered += numFiltered;
+    }
+
     size_t numTested{0};
+    size_t numFiltered{0};
 };
 
 struct LimitSkipStats final : public SpecificStats {

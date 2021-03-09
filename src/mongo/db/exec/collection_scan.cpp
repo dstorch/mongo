@@ -275,6 +275,7 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
         *out = memberID;
         return PlanStage::ADVANCED;
     } else {
+        ++_specificStats.docsFiltered;
         _workingSet->free(memberID);
         return PlanStage::NEED_TIME;
     }

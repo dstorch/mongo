@@ -83,13 +83,8 @@ std::unique_ptr<FindCommand> parseCmdObjectToFindCommand(OperationContext* opCtx
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
     const FindCommand& findCommand,
+    const CollectionPtr& collection,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
-    std::unique_ptr<CollatorInterface> collator;
-    if (!findCommand.getCollation().isEmpty()) {
-        collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                       ->makeFromBSON(findCommand.getCollation()));
-    }
-
     // Although both 'find' and 'aggregate' commands have an ExpressionContext, some of the data
     // members in the ExpressionContext are used exclusively by the aggregation subsystem. This
     // includes the following fields which here we simply initialize to some meaningless default
@@ -114,7 +109,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         false,  // isMapReduceCommand
         findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()),
         findCommand.getLegacyRuntimeConstants(),
-        std::move(collator),
+        resolveCollator(opCtx, findCommand.getCollation(), collection),
         nullptr,  // mongoProcessInterface
         StringMap<ExpressionContext::ResolvedNamespace>{},
         boost::none,                             // uuid
@@ -253,7 +248,8 @@ public:
 
             // Finish the parsing step by using the FindCommand to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            auto expCtx = makeExpressionContext(opCtx, *findCommand, verbosity);
+            auto expCtx =
+                makeExpressionContext(opCtx, *findCommand, ctx->getCollection(), verbosity);
             const bool isExplain = true;
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
@@ -404,7 +400,8 @@ public:
 
             // Finish the parsing step by using the FindCommand to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            auto expCtx = makeExpressionContext(opCtx, *findCommand, boost::none /* verbosity */);
+            auto expCtx = makeExpressionContext(
+                opCtx, *findCommand, ctx->getCollection(), boost::none /* verbosity */);
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
                                              std::move(findCommand),

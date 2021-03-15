@@ -49,6 +49,7 @@ ExpressionContext::ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregateCommand& request,
                                      std::unique_ptr<CollatorInterface> collator,
+                                     bool ignoreFieldOrder,
                                      std::shared_ptr<MongoProcessInterface> processInterface,
                                      StringMap<ResolvedNamespace> resolvedNamespaces,
                                      boost::optional<UUID> collUUID,
@@ -63,6 +64,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                         request.getNamespace(),
                         request.getLegacyRuntimeConstants(),
                         std::move(collator),
+                        ignoreFieldOrder,
                         std::move(processInterface),
                         std::move(resolvedNamespaces),
                         std::move(collUUID),
@@ -87,6 +89,7 @@ ExpressionContext::ExpressionContext(
     const NamespaceString& ns,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     std::unique_ptr<CollatorInterface> collator,
+    bool ignoreFieldOrder,
     const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
     boost::optional<UUID> collUUID,
@@ -105,6 +108,7 @@ ExpressionContext::ExpressionContext(
       variablesParseState(variables.useIdGenerator()),
       mayDbProfile(mayDbProfile),
       _collator(std::move(collator)),
+      _ignoreFieldOrder(ignoreFieldOrder),
       _documentComparator(_collator.get()),
       _valueComparator(_collator.get()),
       _resolvedNamespaces(std::move(resolvedNamespaces)) {
@@ -131,6 +135,7 @@ ExpressionContext::ExpressionContext(
 ExpressionContext::ExpressionContext(
     OperationContext* opCtx,
     std::unique_ptr<CollatorInterface> collator,
+    bool ignoreFieldOrder,
     const NamespaceString& nss,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     const boost::optional<BSONObj>& letParameters,
@@ -146,6 +151,7 @@ ExpressionContext::ExpressionContext(
       variablesParseState(variables.useIdGenerator()),
       mayDbProfile(mayDbProfile),
       _collator(std::move(collator)),
+      _ignoreFieldOrder(ignoreFieldOrder),
       _documentComparator(_collator.get()),
       _valueComparator(_collator.get()) {
     if (runtimeConstants) {
@@ -201,6 +207,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                                                     ns,
                                                     boost::none,  // runtimeConstants
                                                     std::move(collator),
+                                                    _ignoreFieldOrder,
                                                     mongoProcessInterface,
                                                     _resolvedNamespaces,
                                                     uuid);

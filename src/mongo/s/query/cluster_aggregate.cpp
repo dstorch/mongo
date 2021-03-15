@@ -120,6 +120,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         opCtx,
         request,
         std::move(collation),
+        false,  // TODO use the operation's actual value here.
         std::make_shared<MongosProcessInterface>(
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()),
         std::move(resolvedNamespaces),
@@ -317,7 +318,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         invariant(targeter.policy ==
                   cluster_aggregation_planner::AggregationTargeter::kPassthrough);
         expCtx = make_intrusive<ExpressionContext>(
-            opCtx, nullptr, namespaces.executionNss, boost::none, request.getLet());
+            opCtx, nullptr, false, namespaces.executionNss, boost::none, request.getLet());
     }
 
     if (request.getExplain()) {

@@ -519,7 +519,7 @@ Collection::Validator CollectionImpl::parseValidator(
     }
 
     auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, CollatorInterface::cloneCollator(_shared->_collator.get()), ns());
+        opCtx, CollatorInterface::cloneCollator(_shared->_collator.get()), false /* TODO */, ns());
 
     // The MatchExpression and contained ExpressionContext created as part of the validator are
     // owned by the Collection and will outlive the OperationContext they were created under.

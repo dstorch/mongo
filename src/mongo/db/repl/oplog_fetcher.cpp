@@ -643,7 +643,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
             [&](const BSONObj& data) {
                 auto opCtx = cc().makeOperationContext();
                 boost::intrusive_ptr<ExpressionContext> expCtx(
-                    new ExpressionContext(opCtx.get(), nullptr, _nss));
+                    new ExpressionContext(opCtx.get(), nullptr, false, _nss));
                 Matcher m(data["document"].Obj(), expCtx);
                 // TODO SERVER-46240: Handle batchSize 1 in DBClientCursor.
                 // Due to a bug in DBClientCursor, it actually uses batchSize 2 if the given
@@ -717,7 +717,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         } else if (!_config.queryFilter.isEmpty()) {
             auto opCtx = cc().makeOperationContext();
             auto expCtx =
-                make_intrusive<ExpressionContext>(opCtx.get(), nullptr /* collator */, _nss);
+                make_intrusive<ExpressionContext>(opCtx.get(), nullptr /* collator */, false, _nss);
             Matcher m(_config.queryFilter, expCtx);
             if (!m.matches(*firstDocToApply))
                 firstDocToApply++;

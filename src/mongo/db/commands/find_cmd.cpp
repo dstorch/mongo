@@ -115,6 +115,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()),
         findCommand.getLegacyRuntimeConstants(),
         std::move(collator),
+        findCommand.getIgnoreFieldOrder(),
         nullptr,  // mongoProcessInterface
         StringMap<ExpressionContext::ResolvedNamespace>{},
         boost::none,                             // uuid

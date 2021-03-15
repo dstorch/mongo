@@ -95,6 +95,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePip
                                                     _oplogBufferNss,
                                                     boost::none, /* runtimeConstants */
                                                     nullptr,     /* collator */
+                                                    false,       /* ignoreFieldOrder */
                                                     std::move(mongoProcessInterface),
                                                     std::move(resolvedNamespaces),
                                                     boost::none /* collUUID */);

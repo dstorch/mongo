@@ -98,6 +98,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         nss,
         runtimeConstants,
         std::move(resolvedCollator),
+        false,  // TODO plumb proper value of ignoreFieldOrder.
         std::make_shared<MongosProcessInterface>(
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()),
         std::move(resolvedNamespaces),

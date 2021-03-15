@@ -71,6 +71,7 @@ boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext*
                                              NamespaceString::kRsOplogNamespace,
                                              boost::none, /* runtimeConstants */
                                              nullptr,     /* collator */
+                                             false,       /* ignoreFieldOrder */
                                              MongoProcessInterface::create(opCtx),
                                              std::move(resolvedNamespaces),
                                              boost::none); /* collUUID */

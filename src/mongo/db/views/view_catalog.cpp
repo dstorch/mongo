@@ -429,6 +429,7 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::validatePipeline(
         new ExpressionContext(opCtx,
                               AggregateCommand(viewDef.viewOn(), viewDef.pipeline()),
                               CollatorInterface::cloneCollator(viewDef.defaultCollator()),
+                              false,  // TODO should this use a collection default?
                               // We can use a stub MongoProcessInterface because we are only parsing
                               // the Pipeline for validation here. We won't do anything with the
                               // pipeline that will require a real implementation.

@@ -107,7 +107,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss) {
     invariant(opCtx);
 
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss);
+    // TODO handle ignoreFieldOrder
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, false, nss);
     if (!requestCollation.isEmpty()) {
         auto statusWithCollator = CollatorFactoryInterface::get(expCtx->opCtx->getServiceContext())
                                       ->makeFromBSON(requestCollation);
@@ -581,6 +582,8 @@ public:
         // CanonicalQuery a collation already, set it from the collection default.
         if (_cq->getFindCommand().getCollation().isEmpty() && _cq->getCollator() == nullptr &&
             _collection->getDefaultCollator()) {
+            // TODO: also resolve a collection-default ignoreFieldOrder value? There are other
+            // places where this resolution happens which likely need to be changed too.
             _cq->setCollator(_collection->getDefaultCollator()->clone());
         }
 

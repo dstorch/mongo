@@ -214,7 +214,8 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     // would match the same set of documents, but these are not currently considered equivalent.
     // TODO SERVER-47664: take collation into account while comparing string predicates.
     if (isFCVAtLeast47 && other->getFilterExpression()) {
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), ns);
+        // TODO
+        auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), false, ns);
         auto filter = MatchExpressionParser::parseAndNormalize(partialFilterExpression(), expCtx);
         if (!filter->equivalent(other->getFilterExpression())) {
             return Comparison::kDifferent;

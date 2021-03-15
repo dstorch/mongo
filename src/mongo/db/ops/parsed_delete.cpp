@@ -72,6 +72,7 @@ Status ParsedDelete::parseRequest() {
     }
     _expCtx = make_intrusive<ExpressionContext>(_opCtx,
                                                 std::move(collator),
+                                                false,  // TODO
                                                 _request->getNsString(),
                                                 _request->getLegacyRuntimeConstants(),
                                                 _request->getLet());

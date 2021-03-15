@@ -114,7 +114,7 @@ public:
                 // The collator is null because database metadata objects are compared using simple
                 // binary comparison.
                 auto expCtx = make_intrusive<ExpressionContext>(
-                    opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns());
+                    opCtx, std::unique_ptr<CollatorInterface>(nullptr), false, ns());
                 auto matcher = uassertStatusOK(
                     MatchExpressionParser::parse(filterObj.get(), std::move(expCtx)));
                 filter = std::move(matcher);

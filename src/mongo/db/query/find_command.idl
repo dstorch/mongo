@@ -93,6 +93,10 @@ commands:
       collation:
         description: "Specifies the collation to use for the operation."
         type: object_owned_nonempty_serialize
+      ignoreFieldOrder:
+        description: "Specifies that comparisons should ignore object field order."
+        type: bool
+        default: false
       skip:
         description: "Number of documents to skip."
         type: safeInt64

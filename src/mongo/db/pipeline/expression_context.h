@@ -106,6 +106,7 @@ public:
     ExpressionContext(OperationContext* opCtx,
                       const AggregateCommand& request,
                       std::unique_ptr<CollatorInterface> collator,
+                      bool ignoreFieldOrder,
                       std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
                       boost::optional<UUID> collUUID,
@@ -126,6 +127,7 @@ public:
                       const NamespaceString& ns,
                       const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
                       std::unique_ptr<CollatorInterface> collator,
+                      bool ignoreFieldOrder,
                       const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
                       boost::optional<UUID> collUUID,
@@ -140,6 +142,7 @@ public:
      */
     ExpressionContext(OperationContext* opCtx,
                       std::unique_ptr<CollatorInterface> collator,
+                      bool ignoreFieldOrder,
                       const NamespaceString& ns,
                       const boost::optional<LegacyRuntimeConstants>& runtimeConstants = boost::none,
                       const boost::optional<BSONObj>& letParameters = boost::none,
@@ -381,6 +384,9 @@ protected:
 
     // Collator used for comparisons.
     std::unique_ptr<CollatorInterface> _collator;
+
+    // Whether comparisons for this query should ignore field ordering.
+    bool _ignoreFieldOrder;
 
     // Used for all comparisons of Document/Value during execution of the aggregation operation.
     // Must not be changed after parsing a Pipeline with this ExpressionContext.

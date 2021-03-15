@@ -895,7 +895,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
 
     if (!collectionOptions.validator.isEmpty()) {
         boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(opCtx, std::move(collator), nss));
+            new ExpressionContext(opCtx, std::move(collator), false /* TODO */, nss));
 
         // If the feature compatibility version is not kLatest, and we are validating features as
         // primary, ban the use of new agg features introduced in kLatest to prevent them from being

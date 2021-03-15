@@ -145,7 +145,7 @@ public:
                 nss.isValid());
 
         auto expCtx = make_intrusive<ExpressionContext>(
-            opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
+            opCtx, std::unique_ptr<CollatorInterface>(nullptr), false, nss);
 
         // Need a context to get the actual const CollectionPtr&
         // TODO A write lock is currently taken here to accommodate stages that perform writes

@@ -437,6 +437,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         new ExpressionContext(opCtx,
                               request,
                               std::move(collator),
+                              false,  // TODO: make agg support ignoring field order
                               MongoProcessInterface::create(opCtx),
                               uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
                               uuid,

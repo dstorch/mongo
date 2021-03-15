@@ -96,6 +96,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         parsedMr.getNamespace(),
         runtimeConstants,
         std::move(resolvedCollator),
+        false,  // TODO use the operation's actual value
         MongoProcessInterface::create(opCtx),
         StringMap<ExpressionContext::ResolvedNamespace>{},  // resolvedNamespaces
         uuid,

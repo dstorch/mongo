@@ -45,6 +45,7 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
       _expCtx(make_intrusive<ExpressionContext>(
           opCtx,
           nullptr,
+          false,  // TODO
           _request->getNamespaceString(),
           _request->getLegacyRuntimeConstants(),
           _request->getLetParameters(),

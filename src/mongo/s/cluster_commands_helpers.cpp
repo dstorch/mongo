@@ -134,6 +134,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
         nss,
         runtimeConstants,
         std::move(cif),
+        false,  // TODO needs plumbing?
         MongoProcessInterface::create(opCtx),
         std::move(resolvedNamespaces),
         boost::none,  // collection uuid
@@ -406,7 +407,8 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
     }
 
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
+    auto expCtx =
+        make_intrusive<ExpressionContext>(opCtx, std::move(collator), false /* TODO */, nss);
     cm.getShardIdsForQuery(expCtx, query, collation, &shardIds);
 
     for (const ShardId& shardId : shardIds) {

@@ -254,7 +254,7 @@ public:
             }
 
             auto expCtx = make_intrusive<ExpressionContext>(
-                opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
+                opCtx, std::unique_ptr<CollatorInterface>(nullptr), false, nss);
 
             auto ws = std::make_unique<WorkingSet>();
             auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());

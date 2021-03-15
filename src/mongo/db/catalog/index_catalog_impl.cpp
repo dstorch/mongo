@@ -708,8 +708,11 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
 
     // Create an ExpressionContext, used to parse the match expression and to house the collator for
     // the remaining checks.
+    //
+    // TODO: Will we allow 'ignoreFieldOrder=true' on indexes? Presumably no, but if we did I
+    // suppose we would sort the fields of the object prior to storing the index key?
     boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, std::move(collator), nss));
+        new ExpressionContext(opCtx, std::move(collator), false, nss));
 
     // Ensure if there is a filter, its valid.
     BSONElement filterElement = spec.getField("partialFilterExpression");

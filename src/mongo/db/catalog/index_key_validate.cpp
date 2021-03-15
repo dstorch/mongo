@@ -405,7 +405,7 @@ StatusWith<BSONObj> validateIndexSpec(
             // resolving the expression against a given namespace.
             auto simpleCollator = nullptr;
             boost::intrusive_ptr<ExpressionContext> expCtx(
-                new ExpressionContext(opCtx, simpleCollator, NamespaceString()));
+                new ExpressionContext(opCtx, simpleCollator, false, NamespaceString()));
 
             // Special match expression features (e.g. $jsonSchema, $expr, ...) are not allowed in a
             // partialFilterExpression on index creation.

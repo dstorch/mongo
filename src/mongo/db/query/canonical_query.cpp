@@ -106,6 +106,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         invariant(findCommand->getNamespaceOrUUID().nss());
         newExpCtx = make_intrusive<ExpressionContext>(opCtx,
                                                       std::move(collator),
+                                                      findCommand->getIgnoreFieldOrder(),
                                                       *findCommand->getNamespaceOrUUID().nss(),
                                                       findCommand->getLegacyRuntimeConstants(),
                                                       findCommand->getLet());
@@ -117,6 +118,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
         if (collator.get() && expCtx->getCollator()) {
             invariant(CollatorInterface::collatorsMatch(collator.get(), expCtx->getCollator()));
         }
+
+        // TODO: Need to validate that field orders match as well.
     }
 
     // Make the CQ we'll hopefully return.

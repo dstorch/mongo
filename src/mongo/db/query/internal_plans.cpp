@@ -60,7 +60,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
     auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString(ns));
+        opCtx, std::unique_ptr<CollatorInterface>(nullptr), false, NamespaceString(ns));
 
     if (!collection) {
         auto eof = std::make_unique<EOFStage>(expCtx.get());
@@ -106,7 +106,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto ws = std::make_unique<WorkingSet>();
 
     auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
+        opCtx, std::unique_ptr<CollatorInterface>(nullptr), false, collection->ns());
 
     auto root = _collectionScan(
         expCtx, ws.get(), &collection, direction, boost::none, minRecord, maxRecord);
@@ -139,7 +139,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
     auto ws = std::make_unique<WorkingSet>();
 
     auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
+        opCtx, std::unique_ptr<CollatorInterface>(nullptr), false, collection->ns());
 
     std::unique_ptr<PlanStage> root = _indexScan(expCtx,
                                                  ws.get(),
@@ -177,7 +177,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto ws = std::make_unique<WorkingSet>();
 
     auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
+        opCtx, std::unique_ptr<CollatorInterface>(nullptr), false, collection->ns());
 
     std::unique_ptr<PlanStage> root = _indexScan(expCtx,
                                                  ws.get(),
@@ -215,7 +215,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
     auto ws = std::make_unique<WorkingSet>();
 
     auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
+        opCtx, std::unique_ptr<CollatorInterface>(nullptr), false, collection->ns());
 
     auto idHackStage =
         std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collection, descriptor);

@@ -326,8 +326,10 @@ Status _checkPrecondition(OperationContext* opCtx,
 
         // applyOps does not allow any extensions, such as $text, $where, $geoNear, $near,
         // $nearSphere, or $expr.
+        //
+        // TODO Does applyOps command need to allow for ignoreFieldOrder?
         boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(opCtx, CollatorInterface::cloneCollator(collator), nss));
+            new ExpressionContext(opCtx, CollatorInterface::cloneCollator(collator), false, nss));
         Matcher matcher(preCondition["res"].Obj(), std::move(expCtx));
         if (!matcher.matches(realres)) {
             result->append("got", realres);

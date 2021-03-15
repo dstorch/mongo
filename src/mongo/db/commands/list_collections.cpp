@@ -276,7 +276,7 @@ public:
 
             // The collator is null because collection objects are compared using binary comparison.
             auto expCtx = make_intrusive<ExpressionContext>(
-                opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString(dbName));
+                opCtx, std::unique_ptr<CollatorInterface>(nullptr), false, NamespaceString(dbName));
 
             if (listCollRequest.getFilter()) {
                 matcher = uassertStatusOK(

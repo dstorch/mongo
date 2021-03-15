@@ -494,7 +494,7 @@ Status validateCollationSpec(const Collation& collation, const BSONObj& spec) {
 }  // namespace
 
 StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
-    const BSONObj& spec) {
+    const BSONObj& spec) const {
 
     Collation collation;
     try {

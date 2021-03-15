@@ -385,6 +385,22 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
     return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin");
 }
 
+Collator resolveCollator(OperationContext* opCtx,
+                         BSONObj userCollation,
+                         const CollectionPtr& collection) {
+    if (!userCollation.isEmpty()) {
+        auto unicodeCollatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
+        return Collator{std::move(userCollation), *unicodeCollatorFactory};
+    }
+
+    // TODO: Should 'Collection' hold a 'Collator' instead of a 'UnicodeCollatorInterface'? To some
+    // degree it depends on whether we want to allow these things to be collection-defaults.
+    auto defaultUnicodeCollator =
+        (collection && collection->getDefaultCollator() ? collection->getDefaultCollator()->clone()
+                                                        : nullptr);
+    return Collator{std::move(defaultUnicodeCollator), 0 /* default 'ComparisonRuleSet' */};
+}
+
 namespace {
 /**
  * A base class to hold the result returned by PrepareExecutionHelper::prepare call.

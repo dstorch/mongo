@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/collation/collator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/explain_options.h"
@@ -174,7 +175,7 @@ public:
     }
 
     const CollatorInterface* getCollator() const {
-        return _collator.get();
+        return _unicodeCollator.get();
     }
 
     /**
@@ -192,9 +193,11 @@ public:
      * SERVER-24433 describes an ambiguity between a null collator, here we can say confidently that
      * null must mean simple since we have already handled "absence of a collator" before creating
      * the ExpressionContext.
+     *
+     * TODO: Revisit this.
      */
     BSONObj getCollatorBSON() const {
-        return _collator ? _collator->getSpec().toBSON() : CollationSpec::kSimpleSpec;
+        return _unicodeCollator ? _unicodeCollator->getSpec().toBSON() : CollationSpec::kSimpleSpec;
     }
 
     /**
@@ -202,13 +205,15 @@ public:
      *
      * Use with caution - '_collator' is used in the context of a Pipeline, and it is illegal
      * to change the collation once a Pipeline has been parsed with this ExpressionContext.
+     *
+     * TODO revisit this
      */
     void setCollator(std::unique_ptr<CollatorInterface> collator) {
-        _collator = std::move(collator);
+        _unicodeCollator = std::move(collator);
 
         // Document/Value comparisons must be aware of the collation.
-        _documentComparator = DocumentComparator(_collator.get());
-        _valueComparator = ValueComparator(_collator.get());
+        _documentComparator = DocumentComparator(_unicodeCollator.get());
+        _valueComparator = ValueComparator(_unicodeCollator.get());
     }
 
     const DocumentComparator& getDocumentComparator() const {
@@ -379,8 +384,11 @@ protected:
 
     friend class CollatorStash;
 
+    // TODO: construct this property, and replace the other members below.
+    Collator _collator;
+
     // Collator used for comparisons.
-    std::unique_ptr<CollatorInterface> _collator;
+    std::unique_ptr<CollatorInterface> _unicodeCollator;
 
     // Used for all comparisons of Document/Value during execution of the aggregation operation.
     // Must not be changed after parsing a Pipeline with this ExpressionContext.

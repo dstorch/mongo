@@ -42,7 +42,9 @@
 namespace mongo {
 
 StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryMock::makeFromBSON(
-    const BSONObj& spec) {
+    const BSONObj& spec) const {
+    // TODO this logic is likely invalid if we intend to permit {locale: "simple", ignoreFieldOrder:
+    // true}.
     if (SimpleBSONObjComparator::kInstance.evaluate(spec == CollationSpec::kSimpleSpec)) {
         return {nullptr};
     }

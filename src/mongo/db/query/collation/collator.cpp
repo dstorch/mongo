@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,24 +27,22 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator.h"
 
 namespace mongo {
 
-/**
- * Creates CollatorInterface instances backed by the ICU library's collation implementation.
- *
- * Returns success with a null collator on input {locale: "simple"}.
- *
- * TODO: The factory should open collations once, and then return clones when a caller needs a
- * CollatorInterface. This is more efficient because the necessary read-only data will only be
- * prepared once on collation open.
- */
-class CollatorFactoryICU : public CollatorFactoryInterface {
-public:
-    StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) const final;
-};
+Collator::Collator(BSONObj collationSpec, const CollatorFactoryInterface& unicodeCollatorFactory) {
+    _unicodeCollator = uassertStatusOK(unicodeCollatorFactory.makeFromBSON(collationSpec));
+
+    // TODO: Should probably try to avoid re-invoking IDL.
+    auto parsedCollation = Collation::parse({"collation"}, collationSpec);
+    if (parsedCollation.getIgnoreFieldOrder()) {
+        _rulesSet |= ComparisonRules::kIgnoreFieldOrder;
+    }
+
+    initComparators();
+}
 
 }  // namespace mongo

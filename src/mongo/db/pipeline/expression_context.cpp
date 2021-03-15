@@ -104,9 +104,9 @@ ExpressionContext::ExpressionContext(
       timeZoneDatabase(getTimeZoneDatabase(opCtx)),
       variablesParseState(variables.useIdGenerator()),
       mayDbProfile(mayDbProfile),
-      _collator(std::move(collator)),
-      _documentComparator(_collator.get()),
-      _valueComparator(_collator.get()),
+      _unicodeCollator(std::move(collator)),
+      _documentComparator(_unicodeCollator.get()),
+      _valueComparator(_unicodeCollator.get()),
       _resolvedNamespaces(std::move(resolvedNamespaces)) {
 
     if (runtimeConstants && runtimeConstants->getClusterTime().isNull()) {
@@ -145,9 +145,9 @@ ExpressionContext::ExpressionContext(
                            : nullptr),
       variablesParseState(variables.useIdGenerator()),
       mayDbProfile(mayDbProfile),
-      _collator(std::move(collator)),
-      _documentComparator(_collator.get()),
-      _valueComparator(_collator.get()) {
+      _unicodeCollator(std::move(collator)),
+      _documentComparator(_unicodeCollator.get()),
+      _valueComparator(_unicodeCollator.get()) {
     if (runtimeConstants) {
         variables.setLegacyRuntimeConstants(*runtimeConstants);
     }
@@ -168,7 +168,7 @@ void ExpressionContext::checkForInterrupt() {
 
 ExpressionContext::CollatorStash::CollatorStash(ExpressionContext* const expCtx,
                                                 std::unique_ptr<CollatorInterface> newCollator)
-    : _expCtx(expCtx), _originalCollator(std::move(_expCtx->_collator)) {
+    : _expCtx(expCtx), _originalCollator(std::move(_expCtx->_unicodeCollator)) {
     _expCtx->setCollator(std::move(newCollator));
 }
 
@@ -189,7 +189,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
     auto collator = updatedCollator
         ? std::move(*updatedCollator)
-        : (_collator ? _collator->clone() : std::unique_ptr<CollatorInterface>{});
+        : (_unicodeCollator ? _unicodeCollator->clone() : std::unique_ptr<CollatorInterface>{});
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     explain,

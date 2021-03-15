@@ -75,7 +75,8 @@ public:
      * Returns ErrorCodes::IncompatibleCollationVersion if the collator version does not match the
      * version requested in 'spec'.
      */
-    virtual StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) = 0;
+    virtual StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(
+        const BSONObj& spec) const = 0;
 };
 
 }  // namespace mongo

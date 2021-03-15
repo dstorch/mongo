@@ -9,6 +9,8 @@ env.Library(
     target="collator_interface",
     source=[
         "collation_index_key.cpp",
+        # TODO: Not sure if this is the best spot...
+        "collator.cpp",
         "collator_interface.cpp",
     ],
     LIBDEPS=[

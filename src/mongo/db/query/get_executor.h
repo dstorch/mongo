@@ -111,6 +111,14 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
                                   bool tailable);
 
 /**
+ * TODO: Comment.
+ * TODO: Should this code live elsewhere?
+ */
+Collator resolveCollator(OperationContext* opCtx,
+                         BSONObj userCollation,
+                         const CollectionPtr& collection);
+
+/**
  * Get a plan executor for a query.
  *
  * If the query is valid and an executor could be created, returns a StatusWith with the

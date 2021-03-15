@@ -39,7 +39,7 @@ public:
      * Returns a collator that compares strings by reversing them and performing a binary
      * comparison.
      */
-    StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) final;
+    StatusWith<std::unique_ptr<CollatorInterface>> makeFromBSON(const BSONObj& spec) const final;
 };
 
 }  // namespace mongo

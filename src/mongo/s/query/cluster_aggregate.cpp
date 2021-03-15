@@ -317,7 +317,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         invariant(targeter.policy ==
                   cluster_aggregation_planner::AggregationTargeter::kPassthrough);
         expCtx = make_intrusive<ExpressionContext>(
-            opCtx, nullptr, namespaces.executionNss, boost::none, request.getLet());
+            opCtx, Collator{}, namespaces.executionNss, boost::none, request.getLet());
     }
 
     if (request.getExplain()) {

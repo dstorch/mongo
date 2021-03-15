@@ -85,7 +85,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::makePipeline(
                                                     false,       /* isMapReduceCommand */
                                                     sourceNss,
                                                     boost::none, /* runtimeConstants */
-                                                    nullptr,     /* collator */
+                                                    Collator{},
                                                     std::move(mongoProcessInterface),
                                                     std::move(resolvedNamespaces),
                                                     boost::none /* collUUID */);

@@ -53,6 +53,14 @@ public:
     Collator() = default;
 
     /**
+     * Implicit conversion from 'CollatorInterface'.
+     *
+     * TODO: This is a crutch for the POC. It would be best to remove.
+     */
+    Collator(std::unique_ptr<CollatorInterface> unicodeCollator)
+        : Collator(std::move(unicodeCollator), 0) {}
+
+    /**
      * Constructs a 'Collator' based on the applications specification of a collation.
      */
     Collator(BSONObj collationSpec, const CollatorFactoryInterface& unicodeCollatorFactory);
@@ -69,6 +77,24 @@ public:
     const ValueComparator& getValueComparator() const {
         return _valueComparator;
     }
+
+    const CollatorInterface* getUnicodeCollator() const {
+        return _unicodeCollator.get();
+    }
+
+    // TODO: Can this be done away with?
+    void setUnicodeCollator(std::unique_ptr<CollatorInterface> unicodeCollator) {
+        _unicodeCollator = std::move(unicodeCollator);
+        initComparators();
+    }
+
+    // TODO: How necessary is this, really?
+    // TODO: Needs to incorporate 'ignoreFieldOrder'.
+    BSONObj toBson() const {
+        return _unicodeCollator ? _unicodeCollator->getSpec().toBSON() : CollationSpec::kSimpleSpec;
+    }
+
+    Collator clone() const;
 
 private:
     void initComparators() {

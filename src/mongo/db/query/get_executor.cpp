@@ -107,7 +107,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss) {
     invariant(opCtx);
 
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss);
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx, Collator{}, nss);
     if (!requestCollation.isEmpty()) {
         auto statusWithCollator = CollatorFactoryInterface::get(expCtx->opCtx->getServiceContext())
                                       ->makeFromBSON(requestCollation);

@@ -598,7 +598,7 @@ bool runQuery(OperationContext* opCtx,
 
     // Parse the qm into a CanonicalQuery.
     const boost::intrusive_ptr<ExpressionContext> expCtx =
-        make_intrusive<ExpressionContext>(opCtx, nullptr /* collator */, nss);
+        make_intrusive<ExpressionContext>(opCtx, Collator{}, nss);
     auto cq = uassertStatusOKWithContext(
         CanonicalQuery::canonicalize(opCtx,
                                      q,

@@ -261,7 +261,7 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
 
     invariant(collection->getDefaultCollator() == nullptr);
     boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, nullptr, updateRequest.getNamespaceString()));
+        new ExpressionContext(opCtx, Collator{}, updateRequest.getNamespaceString()));
 
     auto matcher =
         fassert(40673, MatchExpressionParser::parse(updateRequest.getQuery(), std::move(expCtx)));

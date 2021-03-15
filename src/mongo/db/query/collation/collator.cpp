@@ -45,4 +45,9 @@ Collator::Collator(BSONObj collationSpec, const CollatorFactoryInterface& unicod
     initComparators();
 }
 
+Collator Collator::clone() const {
+    auto clonedUnicodeCollator = CollatorInterface::cloneCollator(_unicodeCollator.get());
+    return Collator{std::move(clonedUnicodeCollator), _rulesSet};
+}
+
 }  // namespace mongo

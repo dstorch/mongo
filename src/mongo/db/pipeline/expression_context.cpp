@@ -48,7 +48,7 @@ ExpressionContext::ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregateCommand& request,
-                                     std::unique_ptr<CollatorInterface> collator,
+                                     Collator collator,
                                      std::shared_ptr<MongoProcessInterface> processInterface,
                                      StringMap<ResolvedNamespace> resolvedNamespaces,
                                      boost::optional<UUID> collUUID,
@@ -86,7 +86,7 @@ ExpressionContext::ExpressionContext(
     bool isMapReduce,
     const NamespaceString& ns,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-    std::unique_ptr<CollatorInterface> collator,
+    Collator collator,
     const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
     boost::optional<UUID> collUUID,
@@ -104,9 +104,7 @@ ExpressionContext::ExpressionContext(
       timeZoneDatabase(getTimeZoneDatabase(opCtx)),
       variablesParseState(variables.useIdGenerator()),
       mayDbProfile(mayDbProfile),
-      _unicodeCollator(std::move(collator)),
-      _documentComparator(_unicodeCollator.get()),
-      _valueComparator(_unicodeCollator.get()),
+      _collator(std::move(collator)),
       _resolvedNamespaces(std::move(resolvedNamespaces)) {
 
     if (runtimeConstants && runtimeConstants->getClusterTime().isNull()) {
@@ -130,7 +128,7 @@ ExpressionContext::ExpressionContext(
 
 ExpressionContext::ExpressionContext(
     OperationContext* opCtx,
-    std::unique_ptr<CollatorInterface> collator,
+    Collator collator,
     const NamespaceString& nss,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     const boost::optional<BSONObj>& letParameters,
@@ -145,9 +143,7 @@ ExpressionContext::ExpressionContext(
                            : nullptr),
       variablesParseState(variables.useIdGenerator()),
       mayDbProfile(mayDbProfile),
-      _unicodeCollator(std::move(collator)),
-      _documentComparator(_unicodeCollator.get()),
-      _valueComparator(_unicodeCollator.get()) {
+      _collator(std::move(collator)) {
     if (runtimeConstants) {
         variables.setLegacyRuntimeConstants(*runtimeConstants);
     }
@@ -166,9 +162,10 @@ void ExpressionContext::checkForInterrupt() {
     }
 }
 
+// TODO: This is going to need to be handled properly.
 ExpressionContext::CollatorStash::CollatorStash(ExpressionContext* const expCtx,
                                                 std::unique_ptr<CollatorInterface> newCollator)
-    : _expCtx(expCtx), _originalCollator(std::move(_expCtx->_unicodeCollator)) {
+    : _expCtx(expCtx), _originalCollator(nullptr) {
     _expCtx->setCollator(std::move(newCollator));
 }
 
@@ -187,10 +184,6 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     boost::optional<UUID> uuid,
     boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator) const {
 
-    auto collator = updatedCollator
-        ? std::move(*updatedCollator)
-        : (_unicodeCollator ? _unicodeCollator->clone() : std::unique_ptr<CollatorInterface>{});
-
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     explain,
                                                     fromMongos,
@@ -200,7 +193,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                                                     false,  // isMapReduce
                                                     ns,
                                                     boost::none,  // runtimeConstants
-                                                    std::move(collator),
+                                                    _collator.clone(),
                                                     mongoProcessInterface,
                                                     _resolvedNamespaces,
                                                     uuid);

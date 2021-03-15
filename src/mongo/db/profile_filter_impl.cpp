@@ -42,7 +42,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpCtx() {
     // The namespace string can't be database-specific, because the profile filter applies to all
     // databases in the process.
     // Similar to collection validators, it's not safe to share an opCtx in a stored query.
-    return make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString{});
+    return make_intrusive<ExpressionContext>(nullptr, Collator{}, NamespaceString{});
 }
 }  // namespace
 

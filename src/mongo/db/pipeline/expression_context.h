@@ -106,7 +106,7 @@ public:
      */
     ExpressionContext(OperationContext* opCtx,
                       const AggregateCommand& request,
-                      std::unique_ptr<CollatorInterface> collator,
+                      Collator collator,
                       std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
                       boost::optional<UUID> collUUID,
@@ -126,7 +126,7 @@ public:
                       bool isMapReduceCommand,
                       const NamespaceString& ns,
                       const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-                      std::unique_ptr<CollatorInterface> collator,
+                      Collator collator,
                       const std::shared_ptr<MongoProcessInterface>& mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
                       boost::optional<UUID> collUUID,
@@ -140,7 +140,7 @@ public:
      * If 'collator' is null, the simple collator will be used.
      */
     ExpressionContext(OperationContext* opCtx,
-                      std::unique_ptr<CollatorInterface> collator,
+                      Collator collator,
                       const NamespaceString& ns,
                       const boost::optional<LegacyRuntimeConstants>& runtimeConstants = boost::none,
                       const boost::optional<BSONObj>& letParameters = boost::none,
@@ -174,8 +174,9 @@ public:
         return !ns.isCollectionlessAggregateNS();
     }
 
+    // TODO: Just expose underlying 'Collator' instead?
     const CollatorInterface* getCollator() const {
-        return _unicodeCollator.get();
+        return _collator.getUnicodeCollator();
     }
 
     /**
@@ -194,10 +195,10 @@ public:
      * null must mean simple since we have already handled "absence of a collator" before creating
      * the ExpressionContext.
      *
-     * TODO: Revisit this.
+     * TODO: Just expose underlying 'Collator' instead?
      */
     BSONObj getCollatorBSON() const {
-        return _unicodeCollator ? _unicodeCollator->getSpec().toBSON() : CollationSpec::kSimpleSpec;
+        return _collator.toBson();
     }
 
     /**
@@ -209,19 +210,15 @@ public:
      * TODO revisit this
      */
     void setCollator(std::unique_ptr<CollatorInterface> collator) {
-        _unicodeCollator = std::move(collator);
-
-        // Document/Value comparisons must be aware of the collation.
-        _documentComparator = DocumentComparator(_unicodeCollator.get());
-        _valueComparator = ValueComparator(_unicodeCollator.get());
+        _collator.setUnicodeCollator(std::move(collator));
     }
 
     const DocumentComparator& getDocumentComparator() const {
-        return _documentComparator;
+        return _collator.getDocumentComparator();
     }
 
     const ValueComparator& getValueComparator() const {
-        return _valueComparator;
+        return _collator.getValueComparator();
     }
 
     /**
@@ -386,14 +383,6 @@ protected:
 
     // TODO: construct this property, and replace the other members below.
     Collator _collator;
-
-    // Collator used for comparisons.
-    std::unique_ptr<CollatorInterface> _unicodeCollator;
-
-    // Used for all comparisons of Document/Value during execution of the aggregation operation.
-    // Must not be changed after parsing a Pipeline with this ExpressionContext.
-    DocumentComparator _documentComparator;
-    ValueComparator _valueComparator;
 
     // A map from namespace to the resolved namespace, in case any views are involved.
     StringMap<ResolvedNamespace> _resolvedNamespaces;

@@ -106,7 +106,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
                                              false,       /* isMapReduceCommand */
                                              NamespaceString::kSessionTransactionsTableNamespace,
                                              boost::none, /* runtimeConstants */
-                                             nullptr,     /* collator */
+                                             Collator{},
                                              MongoProcessInterface::create(opCtx),
                                              std::move(resolvedNamespaces),
                                              boost::none); /* collUUID */

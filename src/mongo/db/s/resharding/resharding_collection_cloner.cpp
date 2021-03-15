@@ -133,7 +133,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
                                                     false,       /* isMapReduceCommand */
                                                     _sourceNss,
                                                     boost::none, /* runtimeConstants */
-                                                    nullptr,     /* collator */
+                                                    Collator{},
                                                     std::move(mongoProcessInterface),
                                                     std::move(resolvedNamespaces),
                                                     _sourceUUID);

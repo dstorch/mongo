@@ -109,8 +109,8 @@ ExpressionContext::ExpressionContext(
       mayDbProfile(mayDbProfile),
       _collator(std::move(collator)),
       _ignoreFieldOrder(ignoreFieldOrder),
-      _documentComparator(_collator.get()),
-      _valueComparator(_collator.get()),
+      _documentComparator(_collator.get(), ignoreFieldOrder),
+      _valueComparator(_collator.get(), ignoreFieldOrder),
       _resolvedNamespaces(std::move(resolvedNamespaces)) {
 
     if (runtimeConstants && runtimeConstants->getClusterTime().isNull()) {
@@ -152,8 +152,8 @@ ExpressionContext::ExpressionContext(
       mayDbProfile(mayDbProfile),
       _collator(std::move(collator)),
       _ignoreFieldOrder(ignoreFieldOrder),
-      _documentComparator(_collator.get()),
-      _valueComparator(_collator.get()) {
+      _documentComparator(_collator.get(), ignoreFieldOrder),
+      _valueComparator(_collator.get(), ignoreFieldOrder) {
     if (runtimeConstants) {
         variables.setLegacyRuntimeConstants(*runtimeConstants);
     }

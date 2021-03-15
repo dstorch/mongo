@@ -123,7 +123,8 @@ public:
                                   ElementPath::LeafArrayBehavior,
                                   ElementPath::NonLeafArrayBehavior,
                                   clonable_ptr<ErrorAnnotation> annotation = nullptr,
-                                  const CollatorInterface* collator = nullptr);
+                                  const CollatorInterface* collator = nullptr,
+                                  bool ignoreFieldOrder = false);
 
     virtual ~ComparisonMatchExpressionBase() = default;
 
@@ -159,8 +160,9 @@ protected:
     /**
      * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
      */
-    void _doSetCollator(const CollatorInterface* collator) final {
+    void _doSetCollator(const CollatorInterface* collator, bool ignoreFieldOrder) final {
         _collator = collator;
+        _ignoreFieldOrder = ignoreFieldOrder;
     }
 
     // BSON which holds the data referenced by _rhs.
@@ -169,6 +171,8 @@ protected:
 
     // Collator used to compare elements. By default, simple binary comparison will be used.
     const CollatorInterface* _collator = nullptr;
+
+    bool _ignoreFieldOrder = false;
 
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
@@ -201,7 +205,8 @@ public:
                               StringData path,
                               Value rhs,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr,
-                              const CollatorInterface* collator = nullptr);
+                              const CollatorInterface* collator = nullptr,
+                              bool ignoreFieldOrder = false);
 
     virtual ~ComparisonMatchExpression() = default;
 
@@ -215,13 +220,17 @@ public:
     EqualityMatchExpression(StringData path,
                             Value rhs,
                             clonable_ptr<ErrorAnnotation> annotation = nullptr,
-                            const CollatorInterface* collator = nullptr)
-        : ComparisonMatchExpression(EQ, path, std::move(rhs), std::move(annotation), collator) {}
+                            const CollatorInterface* collator = nullptr,
+                            bool ignoreFieldOrder = false)
+        : ComparisonMatchExpression(
+              EQ, path, std::move(rhs), std::move(annotation), collator, ignoreFieldOrder) {}
     EqualityMatchExpression(StringData path,
                             const BSONElement& rhs,
                             clonable_ptr<ErrorAnnotation> annotation = nullptr,
-                            const CollatorInterface* collator = nullptr)
-        : ComparisonMatchExpression(EQ, path, Value(rhs), std::move(annotation), collator) {}
+                            const CollatorInterface* collator = nullptr,
+                            bool ignoreFieldOrder = false)
+        : ComparisonMatchExpression(
+              EQ, path, Value(rhs), std::move(annotation), collator, ignoreFieldOrder) {}
 
     StringData name() const final {
         return kName;
@@ -233,7 +242,7 @@ public:
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        e->setCollator(_collator);
+        e->setCollator(_collator, _ignoreFieldOrder);
         return e;
     }
 
@@ -305,7 +314,7 @@ public:
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        e->setCollator(_collator);
+        e->setCollator(_collator, _ignoreFieldOrder);
         return e;
     }
 
@@ -346,7 +355,7 @@ public:
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        e->setCollator(_collator);
+        e->setCollator(_collator, _ignoreFieldOrder);
         return e;
     }
 
@@ -386,7 +395,7 @@ public:
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        e->setCollator(_collator);
+        e->setCollator(_collator, _ignoreFieldOrder);
         return e;
     }
 
@@ -579,8 +588,10 @@ public:
 
     /**
      * 'collator' must outlive the InMatchExpression and any clones made of it.
+     *
+     * TODO: Probs need to handle 'ignoreFieldOrder' here.
      */
-    virtual void _doSetCollator(const CollatorInterface* collator);
+    virtual void _doSetCollator(const CollatorInterface* collator, bool ignoreFieldOrder);
 
     Status setEqualities(std::vector<BSONElement> equalities);
 

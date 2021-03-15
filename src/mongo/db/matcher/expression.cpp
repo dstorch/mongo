@@ -135,12 +135,12 @@ bool MatchExpression::matchesBSONElement(BSONElement elem, MatchDetails* details
     return matches(&matchableDoc, details);
 }
 
-void MatchExpression::setCollator(const CollatorInterface* collator) {
+void MatchExpression::setCollator(const CollatorInterface* collator, bool ignoreFieldOrder) {
     for (size_t i = 0; i < numChildren(); ++i) {
-        getChild(i)->setCollator(collator);
+        getChild(i)->setCollator(collator, ignoreFieldOrder);
     }
 
-    _doSetCollator(collator);
+    _doSetCollator(collator, ignoreFieldOrder);
 }
 
 void MatchExpression::addDependencies(DepsTracker* deps) const {

@@ -223,6 +223,8 @@ public:
      *  @returns an integer less than zero, zero, or an integer greater than
      *           zero, depending on whether lhs < rhs, lhs == rhs, or lhs > rhs
      *  Warning: may return values other than -1, 0, or 1
+     *
+     * TODO: Allow ignoring field order.
      */
     static int compare(const Document& lhs,
                        const Document& rhs,

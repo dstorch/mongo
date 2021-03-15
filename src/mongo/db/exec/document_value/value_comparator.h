@@ -96,10 +96,13 @@ public:
     ValueComparator() = default;
 
     /**
-     * Constructs a value comparator with special string comparison semantics.
+     * Constructs a value comparator with special comparison semantics.
+     *
+     * TODO: Make 'ignoreFieldOrder' non-optional?
      */
-    ValueComparator(const StringData::ComparatorInterface* stringComparator)
-        : _stringComparator(stringComparator) {}
+    ValueComparator(const StringData::ComparatorInterface* stringComparator,
+                    bool ignoreFieldOrder = false)
+        : _stringComparator(stringComparator), _ignoreFieldOrder(ignoreFieldOrder) {}
 
     /**
      * Returns <0 if 'lhs' is less than 'rhs', 0 if 'lhs' is equal to 'rhs', and >0 if 'lhs' is
@@ -202,6 +205,7 @@ public:
 
 private:
     const StringData::ComparatorInterface* _stringComparator = nullptr;
+    bool _ignoreFieldOrder = false;
 };
 
 //

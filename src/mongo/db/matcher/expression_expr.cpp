@@ -98,7 +98,7 @@ bool ExprMatchExpression::equivalent(const MatchExpression* other) const {
                                       realOther->_expression->serialize(false));
 }
 
-void ExprMatchExpression::_doSetCollator(const CollatorInterface* collator) {
+void ExprMatchExpression::_doSetCollator(const CollatorInterface* collator, bool ignoreFieldOrder) {
     // This function is used to give match expression nodes which don't keep a pointer to the
     // ExpressionContext access to the ExpressionContext's collator. Since the operation only ever
     // has a single CollatorInterface, and since that collator is kept on the ExpressionContext,

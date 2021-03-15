@@ -177,7 +177,7 @@ StatusWithMatchExpression parseComparison(
                               << "'."};
     }
 
-    cmp->setCollator(expCtx->getCollator());
+    cmp->setCollator(expCtx->getCollator(), expCtx->ignoreFieldOrder());
     return {std::move(cmp)};
 }
 

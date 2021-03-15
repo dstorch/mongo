@@ -56,11 +56,13 @@ ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     ElementPath::LeafArrayBehavior leafArrBehavior,
     ElementPath::NonLeafArrayBehavior nonLeafArrBehavior,
     clonable_ptr<ErrorAnnotation> annotation,
-    const CollatorInterface* collator)
+    const CollatorInterface* collator,
+    bool ignoreFieldOrder)
     : LeafMatchExpression(type, path, leafArrBehavior, nonLeafArrBehavior, std::move(annotation)),
       _backingBSON(BSON(path << rhs)),
       _rhs(_backingBSON.firstElement()),
-      _collator(collator) {
+      _collator(collator),
+      _ignoreFieldOrder(ignoreFieldOrder) {
     invariant(_rhs.type() != BSONType::EOO);
 }
 
@@ -100,14 +102,16 @@ ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
                                                      StringData path,
                                                      Value rhs,
                                                      clonable_ptr<ErrorAnnotation> annotation,
-                                                     const CollatorInterface* collator)
+                                                     const CollatorInterface* collator,
+                                                     bool ignoreFieldOrder)
     : ComparisonMatchExpressionBase(type,
                                     path,
                                     std::move(rhs),
                                     ElementPath::LeafArrayBehavior::kTraverse,
                                     ElementPath::NonLeafArrayBehavior::kTraverse,
                                     std::move(annotation),
-                                    collator) {
+                                    collator,
+                                    ignoreFieldOrder) {
     uassert(
         ErrorCodes::BadValue, "cannot compare to undefined", _rhs.type() != BSONType::Undefined);
 
@@ -180,8 +184,13 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
         }
     }
 
-    int x = BSONElement::compareElements(
-        e, _rhs, BSONElement::ComparisonRules::kConsiderFieldName, _collator);
+    BSONElement::ComparisonRulesSet comparisonRules =
+        BSONElement::ComparisonRules::kConsiderFieldName;
+    if (_ignoreFieldOrder) {
+        comparisonRules |= BSONElement::ComparisonRules::kIgnoreFieldOrder;
+    }
+
+    int x = BSONElement::compareElements(e, _rhs, comparisonRules, _collator);
     switch (matchType()) {
         case LT:
             return x < 0;
@@ -491,7 +500,7 @@ bool InMatchExpression::equivalent(const MatchExpression* other) const {
     return true;
 }
 
-void InMatchExpression::_doSetCollator(const CollatorInterface* collator) {
+void InMatchExpression::_doSetCollator(const CollatorInterface* collator, bool ignoreFieldOrder) {
     _collator = collator;
     _eltCmp = BSONElementComparator(BSONElementComparator::FieldNamesMode::kIgnore, _collator);
 

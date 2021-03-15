@@ -180,6 +180,10 @@ public:
         return _collator.get();
     }
 
+    bool ignoreFieldOrder() const {
+        return _ignoreFieldOrder;
+    }
+
     /**
      * Whether to track timing information and "work" counts in the agg layer.
      */
@@ -210,8 +214,8 @@ public:
         _collator = std::move(collator);
 
         // Document/Value comparisons must be aware of the collation.
-        _documentComparator = DocumentComparator(_collator.get());
-        _valueComparator = ValueComparator(_collator.get());
+        _documentComparator = DocumentComparator(_collator.get(), _ignoreFieldOrder);
+        _valueComparator = ValueComparator(_collator.get(), _ignoreFieldOrder);
     }
 
     const DocumentComparator& getDocumentComparator() const {

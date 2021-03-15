@@ -128,6 +128,10 @@ DBQuery.prototype._exec = function() {
                 throw new Error("collation requires use of read commands");
             }
 
+            if (this._special && this._query.ignoreFieldOrder) {
+                throw new Error("ignoreFieldOrder requires use of read commands");
+            }
+
             if (this._special && this._query._allowDiskUse) {
                 throw new Error("allowDiskUse option requires use of read commands");
             }
@@ -228,6 +232,10 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
 
     if ("collation" in this._query) {
         cmd["collation"] = this._query.collation;
+    }
+
+    if ("ignoreFieldOrder" in this._query) {
+        cmd["ignoreFieldOrder"] = this._query.ignoreFieldOrder;
     }
 
     if ("allowDiskUse" in this._query) {
@@ -480,6 +488,10 @@ DBQuery.prototype.readConcern = function(level, atClusterTime = undefined) {
 
 DBQuery.prototype.collation = function(collationSpec) {
     return this._addSpecial("collation", collationSpec);
+};
+
+DBQuery.prototype.ignoreFieldOrder = function(value) {
+    return this._addSpecial("ignoreFieldOrder", true);
 };
 
 DBQuery.prototype.allowDiskUse = function() {

@@ -56,8 +56,10 @@ ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
     ElementPath::LeafArrayBehavior leafArrBehavior,
     ElementPath::NonLeafArrayBehavior nonLeafArrBehavior,
     clonable_ptr<ErrorAnnotation> annotation,
-    const CollatorInterface* collator)
+    const CollatorInterface* collator,
+    ExpressionContext* expCtx)
     : LeafMatchExpression(type, path, leafArrBehavior, nonLeafArrBehavior, std::move(annotation)),
+      _expCtx(expCtx),
       _backingBSON(BSON(path << rhs)),
       _rhs(_backingBSON.firstElement()),
       _collator(collator) {
@@ -100,14 +102,16 @@ ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
                                                      StringData path,
                                                      Value rhs,
                                                      clonable_ptr<ErrorAnnotation> annotation,
-                                                     const CollatorInterface* collator)
+                                                     const CollatorInterface* collator,
+                                                     ExpressionContext* expCtx)
     : ComparisonMatchExpressionBase(type,
                                     path,
                                     std::move(rhs),
                                     ElementPath::LeafArrayBehavior::kTraverse,
                                     ElementPath::NonLeafArrayBehavior::kTraverse,
                                     std::move(annotation),
-                                    collator) {
+                                    collator,
+                                    expCtx) {
     uassert(
         ErrorCodes::BadValue, "cannot compare to undefined", _rhs.type() != BSONType::Undefined);
 
@@ -180,8 +184,13 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
         }
     }
 
-    int x = BSONElement::compareElements(
-        e, _rhs, BSONElement::ComparisonRules::kConsiderFieldName, _collator);
+    // TODO: Make ExpressionContext pointer required
+    // TODO: Do we want to save a pointer to the 'Collator' to avoid the extra level of indirection
+    // at runtime?
+    auto comparisonRules = _expCtx ? _expCtx->collator().getComparisonRulesSet() : 0;
+    auto stringComparator = _expCtx ? _expCtx->collator().getUnicodeCollator() : nullptr;
+
+    int x = BSONElement::compareElements(e, _rhs, comparisonRules, stringComparator);
     switch (matchType()) {
         case LT:
             return x < 0;
@@ -572,8 +581,10 @@ MatchExpression::ExpressionOptimizerFunc InMatchExpression::getOptimizer() const
             return simplifiedExpression;
         } else if (equalitySet.size() == 1 && regexList.empty()) {
             // Simplify IN of exactly one equality to be an EqualityMatchExpression.
+            //
+            // TODO: Need to give $in an ExpressionContext pointer to make this work.
             auto simplifiedExpression = std::make_unique<EqualityMatchExpression>(
-                expression->path(), *(equalitySet.begin()));
+                nullptr, expression->path(), *(equalitySet.begin()));
             simplifiedExpression->setCollator(collator);
             if (expression->getTag()) {
                 simplifiedExpression->setTag(expression->getTag()->clone());

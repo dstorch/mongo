@@ -82,6 +82,10 @@ public:
         return _unicodeCollator.get();
     }
 
+    ComparisonRulesSet getComparisonRulesSet() const {
+        return _rulesSet;
+    }
+
     // TODO: Can this be done away with?
     void setUnicodeCollator(std::unique_ptr<CollatorInterface> unicodeCollator) {
         _unicodeCollator = std::move(unicodeCollator);

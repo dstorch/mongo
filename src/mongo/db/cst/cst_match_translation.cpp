@@ -285,6 +285,7 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
                 // Other types are always treated as equality predicates.
                 [&](auto&& userValue) -> std::unique_ptr<MatchExpression> {
                     return std::make_unique<EqualityMatchExpression>(
+                        expCtx.get(),
                         StringData{stdx::get<UserFieldname>(fieldName)},
                         cst_pipeline_translation::translateLiteralLeaf(cst),
                         nullptr, /* TODO SERVER-49486: Add ErrorAnnotation for MatchExpressions */

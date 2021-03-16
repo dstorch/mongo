@@ -324,6 +324,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
         auto eq =
             parseComparison(e.fieldNameStringData(),
                             std::make_unique<EqualityMatchExpression>(
+                                expCtx.get(),
                                 e.fieldNameStringData(),
                                 e,
                                 doc_validation_error::createAnnotation(expCtx, "$eq", e.wrap())),
@@ -440,7 +441,7 @@ StatusWithMatchExpression parseDBRef(StringData name,
                                      const ExtensionsCallback* extensionsCallback,
                                      MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                                      DocumentParseLevel currentLevel) {
-    auto eq = std::make_unique<EqualityMatchExpression>(elem.fieldName(), elem);
+    auto eq = std::make_unique<EqualityMatchExpression>(expCtx.get(), elem.fieldName(), elem);
 
     // 'id' is collation-aware. 'ref' and 'db' are compared using binary comparison.
     eq->setCollator("id"_sd == name ? expCtx->getCollator() : nullptr);
@@ -1347,7 +1348,10 @@ StatusWithMatchExpression parseAll(StringData name,
             return {Status(ErrorCodes::BadValue, "no $ expressions in $all")};
         } else {
             auto expr = std::make_unique<EqualityMatchExpression>(
-                name, e, doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
+                expCtx.get(),
+                name,
+                e,
+                doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
             expr->setCollator(expCtx->getCollator());
             myAnd->add(expr.release());
         }
@@ -1567,6 +1571,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             StatusWithMatchExpression s = parseComparison(
                 name,
                 std::make_unique<EqualityMatchExpression>(
+                    expCtx.get(),
                     name,
                     e,
                     doc_validation_error::createAnnotation(
@@ -1582,6 +1587,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             return parseComparison(
                 name,
                 std::make_unique<EqualityMatchExpression>(
+                    expCtx.get(),
                     name,
                     e,
                     doc_validation_error::createAnnotation(

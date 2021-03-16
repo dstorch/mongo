@@ -221,6 +221,10 @@ public:
         return _collator.getValueComparator();
     }
 
+    const Collator& collator() const {
+        return _collator;
+    }
+
     /**
      * Temporarily resets the collator to be 'newCollator'. Returns a CollatorStash which will reset
      * the collator back to the old value upon destruction.

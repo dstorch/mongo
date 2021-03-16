@@ -123,7 +123,8 @@ public:
                                   ElementPath::LeafArrayBehavior,
                                   ElementPath::NonLeafArrayBehavior,
                                   clonable_ptr<ErrorAnnotation> annotation = nullptr,
-                                  const CollatorInterface* collator = nullptr);
+                                  const CollatorInterface* collator = nullptr,
+                                  ExpressionContext* expCtx = nullptr);
 
     virtual ~ComparisonMatchExpressionBase() = default;
 
@@ -163,11 +164,16 @@ protected:
         _collator = collator;
     }
 
+    // TODO: Move this to the MatchExpression base class.
+    ExpressionContext* _expCtx = nullptr;
+
     // BSON which holds the data referenced by _rhs.
     BSONObj _backingBSON;
     BSONElement _rhs;
 
     // Collator used to compare elements. By default, simple binary comparison will be used.
+    //
+    // TODO get rid of this in favor of the Collator.
     const CollatorInterface* _collator = nullptr;
 
 private:
@@ -201,7 +207,8 @@ public:
                               StringData path,
                               Value rhs,
                               clonable_ptr<ErrorAnnotation> annotation = nullptr,
-                              const CollatorInterface* collator = nullptr);
+                              const CollatorInterface* collator = nullptr,
+                              ExpressionContext* expCtx = nullptr);
 
     virtual ~ComparisonMatchExpression() = default;
 
@@ -212,24 +219,32 @@ class EqualityMatchExpression final : public ComparisonMatchExpression {
 public:
     static constexpr StringData kName = "$eq"_sd;
 
-    EqualityMatchExpression(StringData path,
+    EqualityMatchExpression(ExpressionContext* expCtx,
+                            StringData path,
                             Value rhs,
                             clonable_ptr<ErrorAnnotation> annotation = nullptr,
                             const CollatorInterface* collator = nullptr)
-        : ComparisonMatchExpression(EQ, path, std::move(rhs), std::move(annotation), collator) {}
-    EqualityMatchExpression(StringData path,
+        : ComparisonMatchExpression(
+              EQ, path, std::move(rhs), std::move(annotation), collator, expCtx) {
+        tassert(0, "EqualityMatchExpression requires an ExpressionContext", expCtx);
+    }
+
+    EqualityMatchExpression(ExpressionContext* expCtx,
+                            StringData path,
                             const BSONElement& rhs,
                             clonable_ptr<ErrorAnnotation> annotation = nullptr,
                             const CollatorInterface* collator = nullptr)
-        : ComparisonMatchExpression(EQ, path, Value(rhs), std::move(annotation), collator) {}
+        : ComparisonMatchExpression(EQ, path, Value(rhs), std::move(annotation), collator, expCtx) {
+        tassert(0, "EqualityMatchExpression requires an ExpressionContext", expCtx);
+    }
 
     StringData name() const final {
         return kName;
     }
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
-        std::unique_ptr<ComparisonMatchExpression> e =
-            std::make_unique<EqualityMatchExpression>(path(), Value(getData()), _errorAnnotation);
+        std::unique_ptr<ComparisonMatchExpression> e = std::make_unique<EqualityMatchExpression>(
+            _expCtx, path(), Value(getData()), _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }

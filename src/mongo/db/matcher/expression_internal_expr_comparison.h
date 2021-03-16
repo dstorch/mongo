@@ -84,12 +84,9 @@ public:
             return true;
         }
 
-        // TODO: Make ExpressionContext pointer required
         // TODO: Do we want to save a pointer to the 'Collator' to avoid the extra level of
         // indirection at runtime?
-        auto comparisonRules = _expCtx ? _expCtx->collator().getComparisonRulesSet() : 0;
-        auto stringComparator = _expCtx ? _expCtx->collator().getUnicodeCollator() : nullptr;
-        auto comp = elem.woCompare(_rhs, comparisonRules, stringComparator);
+        auto comp = _expCtx->collator().compareBSONElements(elem, _rhs);
 
         switch (matchType()) {
             case INTERNAL_EXPR_GT:

@@ -184,13 +184,17 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
         }
     }
 
-    // TODO: Make ExpressionContext pointer required
+    // TODO: Make ExpressionContext pointer required and kill off the else block.
     // TODO: Do we want to save a pointer to the 'Collator' to avoid the extra level of indirection
     // at runtime?
-    auto comparisonRules = _expCtx ? _expCtx->collator().getComparisonRulesSet() : 0;
-    auto stringComparator = _expCtx ? _expCtx->collator().getUnicodeCollator() : nullptr;
+    int x;
+    if (_expCtx) {
+        x = _expCtx->collator().compareBSONElements(e, _rhs);
+    } else {
+        x = BSONElement::compareElements(
+            e, _rhs, BSONElement::ComparisonRules::kConsiderFieldName, _collator);
+    }
 
-    int x = BSONElement::compareElements(e, _rhs, comparisonRules, stringComparator);
     switch (matchType()) {
         case LT:
             return x < 0;

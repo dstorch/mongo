@@ -86,6 +86,10 @@ public:
         return _rulesSet;
     }
 
+    int compareBSONElements(BSONElement left, BSONElement right) const {
+        return BSONElement::compareElements(left, right, _rulesSet, _unicodeCollator.get());
+    }
+
     // TODO: Can this be done away with?
     void setUnicodeCollator(std::unique_ptr<CollatorInterface> unicodeCollator) {
         _unicodeCollator = std::move(unicodeCollator);

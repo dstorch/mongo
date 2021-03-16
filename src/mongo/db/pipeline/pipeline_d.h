@@ -127,25 +127,6 @@ public:
      */
     static BSONObj getPostBatchResumeToken(const Pipeline* pipeline);
 
-    /**
-     * Resolves the collator to either the user-specified collation or, if none was specified, to
-     * the collection-default collation.
-     *
-     * TODO: This now duplicates the logic in get_executor.h and should be deleted.
-     */
-    static std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
-                                                              BSONObj userCollation,
-                                                              const CollectionPtr& collection) {
-        if (!userCollation.isEmpty()) {
-            return uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                       ->makeFromBSON(userCollation));
-        }
-
-        return (collection && collection->getDefaultCollator()
-                    ? collection->getDefaultCollator()->clone()
-                    : nullptr);
-    }
-
 private:
     PipelineD();  // does not exist:  prevent instantiation
 

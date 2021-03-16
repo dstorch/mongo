@@ -56,4 +56,20 @@ let error = assert.throws(() => view.find({obj: {a: 1, b: 1}})
                                     .collation({locale: "simple", ignoreFieldOrder: true})
                                     .itcount());
 assert.commandFailedWithCode(error, ErrorCodes.OptionNotSupportedOnView);
+
+// Test that mapReduce operations respect 'ignoreFieldOrder'.
+const mapFunction = function() {
+    emit(this.obj.a, this.obj.b);
+};
+
+const reduceFunction = function(a, b) {
+    return Array.sum(b);
+};
+
+let mrOutput = assert.commandWorked(coll.mapReduce(mapFunction, reduceFunction, {
+    query: {obj: {a: 1, b: 1}},
+    out: {inline: 1},
+    collation: {locale: "simple", ignoreFieldOrder: true}
+}));
+assert.eq(mrOutput.results, [{_id: 1, value: 2}]);
 }());

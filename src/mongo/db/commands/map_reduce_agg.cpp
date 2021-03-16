@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/explain_common.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/map_reduce_output_format.h"
 #include "mongo/db/query/plan_executor_factory.h"
 
@@ -69,7 +70,7 @@ auto makeExpressionContext(OperationContext* opCtx,
             "mapReduce on a view is not supported",
             !ctx.getView());
 
-    auto resolvedCollator = PipelineD::resolveCollator(
+    auto resolvedCollator = resolveCollator(
         opCtx, parsedMr.getCollation().get_value_or(BSONObj()), ctx.getCollection());
 
     // The UUID of the collection for the execution namespace of this aggregation.

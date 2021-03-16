@@ -130,6 +130,8 @@ public:
     /**
      * Resolves the collator to either the user-specified collation or, if none was specified, to
      * the collection-default collation.
+     *
+     * TODO: This now duplicates the logic in get_executor.h and should be deleted.
      */
     static std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
                                                               BSONObj userCollation,

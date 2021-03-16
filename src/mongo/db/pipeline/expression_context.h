@@ -174,7 +174,7 @@ public:
         return !ns.isCollectionlessAggregateNS();
     }
 
-    // TODO: Just expose underlying 'Collator' instead?
+    // TODO: This should be either renamed or deleted given the similar 'collator()' added below.
     const CollatorInterface* getCollator() const {
         return _collator.getUnicodeCollator();
     }

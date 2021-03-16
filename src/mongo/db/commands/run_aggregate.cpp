@@ -427,11 +427,10 @@ void setIgnoredShardVersionForMergeCursors(OperationContext* opCtx,
     }
 }
 
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
-    OperationContext* opCtx,
-    const AggregateCommand& request,
-    std::unique_ptr<CollatorInterface> collator,
-    boost::optional<UUID> uuid) {
+boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
+                                                              const AggregateCommand& request,
+                                                              Collator collator,
+                                                              boost::optional<UUID> uuid) {
     setIgnoredShardVersionForMergeCursors(opCtx, request);
     boost::intrusive_ptr<ExpressionContext> expCtx =
         new ExpressionContext(opCtx,
@@ -503,11 +502,7 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
             // cannot be shared between threads. There is no synchronization for pieces of
             // the execution machinery above the Exchange, so nothing above the Exchange can be
             // shared between different exchange-producer cursors.
-            expCtx = makeExpressionContext(opCtx,
-                                           request,
-                                           expCtx->getCollator() ? expCtx->getCollator()->clone()
-                                                                 : nullptr,
-                                           uuid);
+            expCtx = makeExpressionContext(opCtx, request, expCtx->collator().clone(), uuid);
 
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.
@@ -563,7 +558,7 @@ Status runAggregate(OperationContext* opCtx,
 
     // The collation to use for this aggregation. boost::optional to distinguish between the case
     // where the collation has not yet been resolved, and where it has been resolved to nullptr.
-    boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse;
+    boost::optional<Collator> collatorToUse;
 
     // The UUID of the collection for the execution namespace of this aggregation.
     boost::optional<UUID> uuid;
@@ -622,8 +617,8 @@ Status runAggregate(OperationContext* opCtx,
             // If the user specified an explicit collation, adopt it; otherwise, use the simple
             // collation. We do not inherit the collection's default collation or UUID, since
             // the stream may be resuming from a point before the current UUID existed.
-            collatorToUse.emplace(PipelineD::resolveCollator(
-                opCtx, request.getCollation().get_value_or(BSONObj()), nullptr));
+            collatorToUse.emplace(
+                resolveCollator(opCtx, request.getCollation().get_value_or(BSONObj()), nullptr));
 
             // Obtain collection locks on the execution namespace; that is, the oplog.
             ctx.emplace(opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
@@ -639,12 +634,12 @@ Status runAggregate(OperationContext* opCtx,
                                  Top::LockType::NotLocked,
                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                  0);
-            collatorToUse.emplace(PipelineD::resolveCollator(
-                opCtx, request.getCollation().get_value_or(BSONObj()), nullptr));
+            collatorToUse.emplace(
+                resolveCollator(opCtx, request.getCollation().get_value_or(BSONObj()), nullptr));
         } else {
             // This is a regular aggregation. Lock the collection or view.
             ctx.emplace(opCtx, nss, AutoGetCollectionViewMode::kViewsPermitted);
-            collatorToUse.emplace(PipelineD::resolveCollator(
+            collatorToUse.emplace(resolveCollator(
                 opCtx, request.getCollation().get_value_or(BSONObj()), ctx->getCollection()));
             if (ctx->getCollection()) {
                 uuid = ctx->getCollection()->uuid();
@@ -675,7 +670,7 @@ Status runAggregate(OperationContext* opCtx,
             if (!request.getCollation().get_value_or(BSONObj()).isEmpty()) {
                 invariant(collatorToUse);  // Should already be resolved at this point.
                 if (!CollatorInterface::collatorsMatch(ctx->getView()->defaultCollator(),
-                                                       collatorToUse->get())) {
+                                                       collatorToUse->getUnicodeCollator())) {
                     return {ErrorCodes::OptionNotSupportedOnView,
                             "Cannot override a view's default collation"};
                 }

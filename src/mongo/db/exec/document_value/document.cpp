@@ -746,7 +746,7 @@ public:
     }
 
     bool atEnd() const {
-        return _cur > _sortedElements.size();
+        return _cur >= _sortedElements.size();
     }
 
     const ValueElement& get() {
@@ -767,7 +767,7 @@ public:
 private:
     std::vector<const ValueElement*> _sortedElements;
 
-    size_t _cur;
+    size_t _cur{0};
 };
 
 int Document::compare(const Document& rL,

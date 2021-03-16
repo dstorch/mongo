@@ -46,15 +46,14 @@ assert.eq(2,
                   {collation: {locale: "simple", ignoreFieldOrder: true}})
               .itcount());
 
-// Test that find against a view respects the unordered fields collation.
+// Cannot use 'ignoreFieldOrder' against a view if the view itself is not an 'ignoreFieldOrder'
+// view.
 const viewName = "ignore_object_field_order_view";
 assert.commandWorked(db.createView(viewName, coll.getName(), []));
 const view = db[viewName];
-assert.eq(
-    2,
-    view.find({obj: {a: 1, b: 1}}).collation({locale: "simple", ignoreFieldOrder: true}).itcount());
-assert.eq(2,
-          view.find({$expr: {$eq: ["$obj", {$literal: {a: 1, b: 1}}]}})
-              .collation({locale: "simple", ignoreFieldOrder: true})
-              .itcount());
+assert.eq(1, view.find({obj: {a: 1, b: 1}}).itcount());
+let error = assert.throws(() => view.find({obj: {a: 1, b: 1}})
+                                    .collation({locale: "simple", ignoreFieldOrder: true})
+                                    .itcount());
+assert.commandFailedWithCode(error, ErrorCodes.OptionNotSupportedOnView);
 }());

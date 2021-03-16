@@ -674,8 +674,14 @@ Status runAggregate(OperationContext* opCtx,
                     return {ErrorCodes::OptionNotSupportedOnView,
                             "Cannot override a view's default collation"};
                 }
-            }
 
+                // TODO: The way we check whether the collators are unequal should change once we
+                // allow storage of ignoreFieldOrder:true as a view's collation.
+                if (collatorToUse->getComparisonRulesSet() != 0) {
+                    return {ErrorCodes::OptionNotSupportedOnView,
+                            "Cannot override a view's default collation"};
+                }
+            }
 
             auto resolvedView = uassertStatusOK(DatabaseHolder::get(opCtx)
                                                     ->getViewCatalog(opCtx, nss.db())

@@ -31,6 +31,8 @@
 
 #include "mongo/db/matcher/expression_leaf.h"
 
+#include "mongo/db/pipeline/expression_context.h"
+
 namespace mongo {
 
 /**
@@ -54,12 +56,18 @@ namespace mongo {
 template <typename T>
 class InternalExprComparisonMatchExpression : public ComparisonMatchExpressionBase {
 public:
-    InternalExprComparisonMatchExpression(MatchType type, StringData path, BSONElement value)
+    InternalExprComparisonMatchExpression(MatchType type,
+                                          StringData path,
+                                          BSONElement value,
+                                          ExpressionContext* expCtx = nullptr)
         : ComparisonMatchExpressionBase(type,
                                         path,
                                         Value(value),
                                         ElementPath::LeafArrayBehavior::kNoTraversal,
-                                        ElementPath::NonLeafArrayBehavior::kMatchSubpath) {
+                                        ElementPath::NonLeafArrayBehavior::kMatchSubpath,
+                                        nullptr,
+                                        nullptr,
+                                        expCtx) {
         invariant(_rhs.type() != BSONType::Undefined);
         invariant(_rhs.type() != BSONType::Array);
     }
@@ -76,7 +84,12 @@ public:
             return true;
         }
 
-        auto comp = elem.woCompare(_rhs, BSONElement::ComparisonRulesSet(0), _collator);
+        // TODO: Make ExpressionContext pointer required
+        // TODO: Do we want to save a pointer to the 'Collator' to avoid the extra level of
+        // indirection at runtime?
+        auto comparisonRules = _expCtx ? _expCtx->collator().getComparisonRulesSet() : 0;
+        auto stringComparator = _expCtx ? _expCtx->collator().getUnicodeCollator() : nullptr;
+        auto comp = elem.woCompare(_rhs, comparisonRules, stringComparator);
 
         switch (matchType()) {
             case INTERNAL_EXPR_GT:
@@ -97,7 +110,7 @@ public:
     };
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto clone = std::make_unique<T>(path(), _rhs);
+        auto clone = std::make_unique<T>(_expCtx, path(), _rhs);
         clone->setCollator(_collator);
         if (getTag()) {
             clone->setTag(getTag()->clone());
@@ -116,9 +129,9 @@ class InternalExprEqMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprEq"_sd;
 
-    InternalExprEqMatchExpression(StringData path, BSONElement value)
+    InternalExprEqMatchExpression(ExpressionContext* expCtx, StringData path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprEqMatchExpression>(
-              MatchType::INTERNAL_EXPR_EQ, path, value) {}
+              MatchType::INTERNAL_EXPR_EQ, path, value, expCtx) {}
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -134,9 +147,9 @@ class InternalExprGTMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprGt"_sd;
 
-    InternalExprGTMatchExpression(StringData path, BSONElement value)
+    InternalExprGTMatchExpression(ExpressionContext* expCtx, StringData path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprGTMatchExpression>(
-              MatchType::INTERNAL_EXPR_GT, path, value) {}
+              MatchType::INTERNAL_EXPR_GT, path, value, expCtx) {}
 
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -153,9 +166,9 @@ class InternalExprGTEMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprGte"_sd;
 
-    InternalExprGTEMatchExpression(StringData path, BSONElement value)
+    InternalExprGTEMatchExpression(ExpressionContext* expCtx, StringData path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprGTEMatchExpression>(
-              MatchType::INTERNAL_EXPR_GTE, path, value) {}
+              MatchType::INTERNAL_EXPR_GTE, path, value, expCtx) {}
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -171,9 +184,9 @@ class InternalExprLTMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprLt"_sd;
 
-    InternalExprLTMatchExpression(StringData path, BSONElement value)
+    InternalExprLTMatchExpression(ExpressionContext* expCtx, StringData path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprLTMatchExpression>(
-              MatchType::INTERNAL_EXPR_LT, path, value) {}
+              MatchType::INTERNAL_EXPR_LT, path, value, expCtx) {}
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -189,9 +202,9 @@ class InternalExprLTEMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprLte"_sd;
 
-    InternalExprLTEMatchExpression(StringData path, BSONElement value)
+    InternalExprLTEMatchExpression(ExpressionContext* expCtx, StringData path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprLTEMatchExpression>(
-              MatchType::INTERNAL_EXPR_LTE, path, value) {}
+              MatchType::INTERNAL_EXPR_LTE, path, value, expCtx) {}
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);

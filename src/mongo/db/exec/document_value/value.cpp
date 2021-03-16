@@ -679,7 +679,8 @@ inline static int cmp(const T& left, const T& right) {
 
 int Value::compare(const Value& rL,
                    const Value& rR,
-                   const StringData::ComparatorInterface* stringComparator) {
+                   const StringData::ComparatorInterface* stringComparator,
+                   ComparisonRulesSet comparisonRulesSet) {
     // Note, this function needs to behave identically to BSONElement::compareElements().
     // Additionally, any changes here must be replicated in hash_combine().
     BSONType lType = rL.getType();
@@ -794,7 +795,8 @@ int Value::compare(const Value& rL,
             return rL.getRawData().compare(rR.getRawData());
 
         case Object:
-            return Document::compare(rL.getDocument(), rR.getDocument(), stringComparator);
+            return Document::compare(
+                rL.getDocument(), rR.getDocument(), stringComparator, comparisonRulesSet);
 
         case Array: {
             const vector<Value>& lArr = rL.getArray();
@@ -803,7 +805,7 @@ int Value::compare(const Value& rL,
             const size_t elems = std::min(lArr.size(), rArr.size());
             for (size_t i = 0; i < elems; i++) {
                 // compare the two corresponding elements
-                ret = Value::compare(lArr[i], rArr[i], stringComparator);
+                ret = Value::compare(lArr[i], rArr[i], stringComparator, comparisonRulesSet);
                 if (ret)
                     return ret;  // values are unequal
             }

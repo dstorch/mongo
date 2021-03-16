@@ -447,7 +447,9 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
 }
 
 std::unique_ptr<MatchExpression> createComparisonPredicate(
-    const ComparisonMatchExpression* matchExpr, const BucketSpec& bucketSpec) {
+    ExpressionContext* expCtx,
+    const ComparisonMatchExpression* matchExpr,
+    const BucketSpec& bucketSpec) {
     auto path = matchExpr->path();
     auto rhs = matchExpr->getData();
 
@@ -478,10 +480,12 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             auto andMatchExpr = std::make_unique<AndMatchExpression>();
 
             andMatchExpr->add(std::make_unique<InternalExprLTEMatchExpression>(
+                expCtx,
                 str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
                               << path,
                 rhs));
             andMatchExpr->add(std::make_unique<InternalExprGTEMatchExpression>(
+                expCtx,
                 str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
                               << path,
                 rhs));
@@ -494,18 +498,21 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
         }
         case MatchExpression::GT: {
             return std::make_unique<InternalExprGTMatchExpression>(
+                expCtx,
                 str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
                               << path,
                 rhs);
         }
         case MatchExpression::GTE: {
             return std::make_unique<InternalExprGTEMatchExpression>(
+                expCtx,
                 str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
                               << path,
                 rhs);
         }
         case MatchExpression::LT: {
             auto controlPred = std::make_unique<InternalExprLTMatchExpression>(
+                expCtx,
                 str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
                               << path,
                 rhs);
@@ -522,6 +529,7 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
         }
         case MatchExpression::LTE: {
             auto controlPred = std::make_unique<InternalExprLTEMatchExpression>(
+                expCtx,
                 str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
                               << path,
                 rhs);
@@ -559,7 +567,8 @@ DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
             return andMatchExpr;
         }
     } else if (ComparisonMatchExpression::isComparisonMatchExpression(matchExpr)) {
-        return createComparisonPredicate(static_cast<const ComparisonMatchExpression*>(matchExpr),
+        return createComparisonPredicate(pExpCtx.get(),
+                                         static_cast<const ComparisonMatchExpression*>(matchExpr),
                                          _bucketUnpacker.bucketSpec());
     }
 

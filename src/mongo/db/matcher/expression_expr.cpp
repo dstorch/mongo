@@ -127,7 +127,7 @@ std::unique_ptr<MatchExpression> ExprMatchExpression::shallowClone() const {
 }
 
 MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() const {
-    return [](std::unique_ptr<MatchExpression> expression) {
+    return [this](std::unique_ptr<MatchExpression> expression) {
         auto& exprMatchExpr = static_cast<ExprMatchExpression&>(*expression);
 
         // If '_expression' can be rewritten to a MatchExpression, we will return a $and node with
@@ -139,8 +139,8 @@ MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() con
         }
 
         exprMatchExpr._expression = exprMatchExpr._expression->optimize();
-        exprMatchExpr._rewriteResult =
-            RewriteExpr::rewrite(exprMatchExpr._expression, exprMatchExpr._expCtx->getCollator());
+        exprMatchExpr._rewriteResult = RewriteExpr::rewrite(
+            _expCtx.get(), exprMatchExpr._expression, exprMatchExpr._expCtx->getCollator());
 
         if (exprMatchExpr._rewriteResult->matchExpression()) {
             auto andMatch = std::make_unique<AndMatchExpression>();

@@ -78,11 +78,13 @@ public:
      * superset of the documents matched by 'expr'. Returns the MatchExpression as a RewriteResult.
      * If a rewrite is not possible, RewriteResult::matchExpression() will return a nullptr.
      */
-    static RewriteResult rewrite(const boost::intrusive_ptr<Expression>& expr,
+    static RewriteResult rewrite(ExpressionContext* expCtx,
+                                 const boost::intrusive_ptr<Expression>& expr,
                                  const CollatorInterface* collator);
 
 private:
-    RewriteExpr(const CollatorInterface* collator) : _collator(collator) {}
+    RewriteExpr(ExpressionContext* expCtx, const CollatorInterface* collator)
+        : _expCtx(expCtx), _collator(collator) {}
 
     // Returns rewritten MatchExpression or null unique_ptr if not rewritable.
     std::unique_ptr<MatchExpression> _rewriteExpression(
@@ -106,6 +108,8 @@ private:
         ExpressionCompare::CmpOp comparisonOp, BSONElement fieldAndValue);
 
     std::vector<BSONObj> _matchExprElemStorage;
+
+    ExpressionContext* _expCtx;
     const CollatorInterface* _collator;
 };
 

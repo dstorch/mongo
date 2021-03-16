@@ -103,8 +103,8 @@ public:
 private:
     void initComparators() {
         // TODO: Need to actually plumb rules set through.
-        _documentComparator = DocumentComparator(_unicodeCollator.get());
-        _valueComparator = ValueComparator(_unicodeCollator.get());
+        _documentComparator = DocumentComparator(_unicodeCollator.get(), _rulesSet);
+        _valueComparator = ValueComparator(_unicodeCollator.get(), _rulesSet);
     }
 
     ComparisonRulesSet _rulesSet = 0;

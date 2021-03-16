@@ -36,6 +36,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/string_map.h"
 
@@ -91,6 +92,9 @@ public:
         const Document& lhs;
         const Document& rhs;
     };
+
+    using ComparisonRules = BSONObj::ComparatorInterface::ComparisonRules;
+    using ComparisonRulesSet = BSONObj::ComparatorInterface::ComparisonRulesSet;
 
     static constexpr StringData metaFieldTextScore = "$textScore"_sd;
     static constexpr StringData metaFieldRandVal = "$randVal"_sd;
@@ -223,10 +227,13 @@ public:
      *  @returns an integer less than zero, zero, or an integer greater than
      *           zero, depending on whether lhs < rhs, lhs == rhs, or lhs > rhs
      *  Warning: may return values other than -1, 0, or 1
+     *
+     *  TODO: May want to make comparison rule set non-optional?
      */
     static int compare(const Document& lhs,
                        const Document& rhs,
-                       const StringData::ComparatorInterface* stringComparator);
+                       const StringData::ComparatorInterface* stringComparator,
+                       ComparisonRulesSet comparisonRulesSet = 0u);
 
     std::string toString() const;
 

@@ -31,6 +31,7 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/exec/document_value/value_internal.h"
 #include "mongo/util/uuid.h"
 
@@ -80,6 +81,8 @@ public:
         const Value& lhs;
         const Value& rhs;
     };
+
+    using ComparisonRulesSet = BSONObj::ComparatorInterface::ComparisonRulesSet;
 
     /** Construct a Value
      *
@@ -293,10 +296,13 @@ public:
      *  @returns an integer less than zero, zero, or an integer greater than
      *           zero, depending on whether lhs < rhs, lhs == rhs, or lhs > rhs
      *  Warning: may return values other than -1, 0, or 1
+     *
+     *  TODO: Make rule set non-optional.
      */
     static int compare(const Value& lhs,
                        const Value& rhs,
-                       const StringData::ComparatorInterface* stringComparator);
+                       const StringData::ComparatorInterface* stringComparator,
+                       ComparisonRulesSet comparisonRulesSet = 0u);
 
     friend DeferredComparison operator==(const Value& lhs, const Value& rhs) {
         return DeferredComparison(DeferredComparison::Type::kEQ, lhs, rhs);

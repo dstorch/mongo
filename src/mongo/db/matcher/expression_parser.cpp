@@ -1722,7 +1722,8 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                              << typeName(e.type()))};
             }
 
-            auto exprEqExpr = std::make_unique<InternalExprEqMatchExpression>(name, e);
+            auto exprEqExpr =
+                std::make_unique<InternalExprEqMatchExpression>(expCtx.get(), name, e);
             exprEqExpr->setCollator(expCtx->getCollator());
             return {std::move(exprEqExpr)};
         }
@@ -1735,7 +1736,8 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                              << typeName(e.type()))};
             }
 
-            auto exprGtExpr = std::make_unique<InternalExprGTMatchExpression>(name, e);
+            auto exprGtExpr =
+                std::make_unique<InternalExprGTMatchExpression>(expCtx.get(), name, e);
             exprGtExpr->setCollator(expCtx->getCollator());
             return {std::move(exprGtExpr)};
         }
@@ -1747,7 +1749,8 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                              << typeName(e.type()))};
             }
 
-            auto exprGteExpr = std::make_unique<InternalExprGTEMatchExpression>(name, e);
+            auto exprGteExpr =
+                std::make_unique<InternalExprGTEMatchExpression>(expCtx.get(), name, e);
             exprGteExpr->setCollator(expCtx->getCollator());
             return {std::move(exprGteExpr)};
         }
@@ -1759,7 +1762,8 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                              << typeName(e.type()))};
             }
 
-            auto exprLtExpr = std::make_unique<InternalExprLTMatchExpression>(name, e);
+            auto exprLtExpr =
+                std::make_unique<InternalExprLTMatchExpression>(expCtx.get(), name, e);
             exprLtExpr->setCollator(expCtx->getCollator());
             return {std::move(exprLtExpr)};
         }
@@ -1771,7 +1775,8 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                              << typeName(e.type()))};
             }
 
-            auto exprLteExpr = std::make_unique<InternalExprLTEMatchExpression>(name, e);
+            auto exprLteExpr =
+                std::make_unique<InternalExprLTEMatchExpression>(expCtx.get(), name, e);
             exprLteExpr->setCollator(expCtx->getCollator());
             return {std::move(exprLteExpr)};
         }

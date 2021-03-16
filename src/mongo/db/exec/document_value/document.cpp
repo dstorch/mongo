@@ -683,18 +683,11 @@ void Document::hash_combine(size_t& seed,
     }
 }
 
-int Document::compare(const Document& rL,
-                      const Document& rR,
-                      const StringData::ComparatorInterface* stringComparator) {
-
-    if (&rL.storage() == &rR.storage()) {
-        // If the storage is the same (shared between the documents) then the documents must be
-        // equal.
-        return 0;
-    }
-    DocumentStorageIterator lIt = rL.storage().iterator();
-    DocumentStorageIterator rIt = rR.storage().iterator();
-
+template <typename Iterator>
+int compareDocuments(Iterator&& lIt,
+                     Iterator&& rIt,
+                     const StringData::ComparatorInterface* stringComparator,
+                     Document::ComparisonRulesSet comparisonRulesSet) {
     while (true) {
         if (lIt.atEnd()) {
             if (rIt.atEnd())
@@ -718,6 +711,8 @@ int Document::compare(const Document& rL,
                 return lCType < rCType ? -1 : 1;
         }
 
+        // TODO: Do we need to deal with 'kConsiderFieldName' here? I don't think so, but maybe we
+        // can assert that it is set?
         const int nameCmp = lField.nameSD().compare(rField.nameSD());
         if (nameCmp)
             return nameCmp;  // field names are unequal
@@ -728,6 +723,71 @@ int Document::compare(const Document& rL,
 
         rIt.advance();
         lIt.advance();
+    }
+}
+
+/**
+ * An iterator which complies with the interface for a regular 'DocumentStorageIterator', but
+ * provides the fields of the document in lexicographically sorted order.
+ */
+class DocumentStorageIteratorSorted {
+public:
+    explicit DocumentStorageIteratorSorted(DocumentStorageIterator unsortedIt) {
+        while (!unsortedIt.atEnd()) {
+            _sortedElements.push_back(&unsortedIt.get());
+            unsortedIt.advance();
+        }
+
+        std::sort(_sortedElements.begin(),
+                  _sortedElements.end(),
+                  [](const ValueElement* left, const ValueElement* right) {
+                      return left->nameSD() < right->nameSD();
+                  });
+    }
+
+    bool atEnd() const {
+        return _cur > _sortedElements.size();
+    }
+
+    const ValueElement& get() {
+        return *_sortedElements[_cur];
+    }
+
+    void advance() {
+        ++_cur;
+    }
+
+    const ValueElement* operator->() {
+        return &get();
+    }
+    const ValueElement& operator*() {
+        return get();
+    }
+
+private:
+    std::vector<const ValueElement*> _sortedElements;
+
+    size_t _cur;
+};
+
+int Document::compare(const Document& rL,
+                      const Document& rR,
+                      const StringData::ComparatorInterface* stringComparator,
+                      ComparisonRulesSet comparisonRulesSet) {
+    if (&rL.storage() == &rR.storage()) {
+        // If the storage is the same (shared between the documents) then the documents must be
+        // equal.
+        return 0;
+    }
+
+    if (comparisonRulesSet & ComparisonRules::kIgnoreFieldOrder) {
+        return compareDocuments(DocumentStorageIteratorSorted{rL.storage().iterator()},
+                                DocumentStorageIteratorSorted{rR.storage().iterator()},
+                                stringComparator,
+                                comparisonRulesSet);
+    } else {
+        return compareDocuments(
+            rL.storage().iterator(), rR.storage().iterator(), stringComparator, comparisonRulesSet);
     }
 }
 

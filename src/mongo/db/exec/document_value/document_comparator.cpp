@@ -36,7 +36,8 @@
 namespace mongo {
 
 bool DocumentComparator::evaluate(Document::DeferredComparison deferredComparison) const {
-    int cmp = Document::compare(deferredComparison.lhs, deferredComparison.rhs, _stringComparator);
+    int cmp = Document::compare(
+        deferredComparison.lhs, deferredComparison.rhs, _stringComparator, _comparisonRulesSet);
     switch (deferredComparison.type) {
         case Document::DeferredComparison::Type::kLT:
             return cmp < 0;

@@ -42,12 +42,13 @@ namespace mongo {
 
 using CmpOp = ExpressionCompare::CmpOp;
 
-RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expression>& expression,
+RewriteExpr::RewriteResult RewriteExpr::rewrite(ExpressionContext* expCtx,
+                                                const boost::intrusive_ptr<Expression>& expression,
                                                 const CollatorInterface* collator) {
     LOGV2_DEBUG(
         20725, 5, "Expression prior to rewrite", "expression"_attr = expression->serialize(false));
 
-    RewriteExpr rewriteExpr(collator);
+    RewriteExpr rewriteExpr(expCtx, collator);
     std::unique_ptr<MatchExpression> matchExpression;
 
     if (auto matchTree = rewriteExpr._rewriteExpression(expression)) {
@@ -191,28 +192,28 @@ std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
 
     switch (comparisonOp) {
         case ExpressionCompare::EQ: {
-            matchExpr = std::make_unique<InternalExprEqMatchExpression>(fieldAndValue.fieldName(),
-                                                                        fieldAndValue);
+            matchExpr = std::make_unique<InternalExprEqMatchExpression>(
+                _expCtx, fieldAndValue.fieldName(), fieldAndValue);
             break;
         }
         case ExpressionCompare::GT: {
-            matchExpr = std::make_unique<InternalExprGTMatchExpression>(fieldAndValue.fieldName(),
-                                                                        fieldAndValue);
+            matchExpr = std::make_unique<InternalExprGTMatchExpression>(
+                _expCtx, fieldAndValue.fieldName(), fieldAndValue);
             break;
         }
         case ExpressionCompare::GTE: {
-            matchExpr = std::make_unique<InternalExprGTEMatchExpression>(fieldAndValue.fieldName(),
-                                                                         fieldAndValue);
+            matchExpr = std::make_unique<InternalExprGTEMatchExpression>(
+                _expCtx, fieldAndValue.fieldName(), fieldAndValue);
             break;
         }
         case ExpressionCompare::LT: {
-            matchExpr = std::make_unique<InternalExprLTMatchExpression>(fieldAndValue.fieldName(),
-                                                                        fieldAndValue);
+            matchExpr = std::make_unique<InternalExprLTMatchExpression>(
+                _expCtx, fieldAndValue.fieldName(), fieldAndValue);
             break;
         }
         case ExpressionCompare::LTE: {
-            matchExpr = std::make_unique<InternalExprLTEMatchExpression>(fieldAndValue.fieldName(),
-                                                                         fieldAndValue);
+            matchExpr = std::make_unique<InternalExprLTEMatchExpression>(
+                _expCtx, fieldAndValue.fieldName(), fieldAndValue);
             break;
         }
         default:

@@ -98,15 +98,16 @@ public:
     /**
      * Constructs a value comparator with special string comparison semantics.
      */
-    ValueComparator(const StringData::ComparatorInterface* stringComparator)
-        : _stringComparator(stringComparator) {}
+    ValueComparator(const StringData::ComparatorInterface* stringComparator,
+                    Value::ComparisonRulesSet comparisonRulesSet)
+        : _stringComparator(stringComparator), _comparisonRulesSet(comparisonRulesSet) {}
 
     /**
      * Returns <0 if 'lhs' is less than 'rhs', 0 if 'lhs' is equal to 'rhs', and >0 if 'lhs' is
      * greater than 'rhs'.
      */
     int compare(const Value& lhs, const Value& rhs) const {
-        return Value::compare(lhs, rhs, _stringComparator);
+        return Value::compare(lhs, rhs, _stringComparator, _comparisonRulesSet);
     }
 
     /**
@@ -114,6 +115,7 @@ public:
      * have equal hashes.
      */
     size_t hash(const Value& val) const {
+        // TODO: Handle 'comparisonRulesSet' during hashing.
         size_t seed = 0xf0afbeef;
         val.hash_combine(seed, _stringComparator);
         return seed;
@@ -202,6 +204,7 @@ public:
 
 private:
     const StringData::ComparatorInterface* _stringComparator = nullptr;
+    Value::ComparisonRulesSet _comparisonRulesSet = 0u;
 };
 
 //
